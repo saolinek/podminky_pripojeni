@@ -43,11 +43,7 @@ import {
   verifyCanChangeAdminPassword,
   verifyLoginPassword,
 } from './services/adminAuthService';
-import {
-  FEEDBACK_NOTIFICATION_EMAIL,
-  sendFeedbackEmailNotification,
-  sendTestFeedbackEmail,
-} from './services/feedbackNotificationService';
+import { sendFeedbackEmailNotification } from './services/feedbackNotificationService';
 import { PlantConfigurator } from './components/PlantConfigurator';
 import { ChecklistView } from './components/ChecklistView';
 import { TemplateDatabaseView } from './components/TemplateDatabaseView';
@@ -390,20 +386,6 @@ export function App() {
     showToast('Děkujeme! Zpětná vazba byla uložena.');
   };
 
-  const handleSendTestFeedbackEmail = async () => {
-    if (adminRole !== 'superadmin') return;
-    const res = await sendTestFeedbackEmail();
-    if (res.ok) {
-      showToast(
-        `Testovací e-mail odeslán na ${FEEDBACK_NOTIFICATION_EMAIL}. Při prvním použití potvrďte odkaz v e-mailu.`
-      );
-    } else {
-      showToast(
-        `Nepodařilo se odeslat testovací e-mail${res.message ? `: ${res.message}` : '.'}`
-      );
-    }
-  };
-
   const handleDeleteFeedback = async (id: string) => {
     if (adminRole !== 'superadmin') {
       showToast('Odstranění zpětné vazby je vyhrazeno pouze pro superadmina.');
@@ -524,7 +506,6 @@ export function App() {
             entries={feedbackEntries}
             onSubmitFeedback={handleSubmitFeedback}
             onDeleteFeedback={handleDeleteFeedback}
-            onSendTestEmail={handleSendTestFeedbackEmail}
             onOpenSuperadminLogin={handleOpenFeedbackSuperadminLogin}
             onLogout={handleAdminLogout}
           />

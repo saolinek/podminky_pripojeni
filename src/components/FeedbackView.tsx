@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   Lock,
   LogOut,
-  Mail,
   MessageSquare,
   Send,
   ShieldCheck,
@@ -16,7 +15,6 @@ import {
   type FeedbackCategory,
   type FeedbackEntry,
 } from '../types';
-import { FEEDBACK_NOTIFICATION_EMAIL } from '../services/feedbackNotificationService';
 
 interface FeedbackViewProps {
   isSuperadmin: boolean;
@@ -28,7 +26,6 @@ interface FeedbackViewProps {
     authorName: string;
   }) => Promise<void>;
   onDeleteFeedback: (id: string) => Promise<void>;
-  onSendTestEmail: () => Promise<void>;
   onOpenSuperadminLogin: () => void;
   onLogout: () => void;
 }
@@ -58,7 +55,6 @@ export const FeedbackView: React.FC<FeedbackViewProps> = ({
   entries,
   onSubmitFeedback,
   onDeleteFeedback,
-  onSendTestEmail,
   onOpenSuperadminLogin,
   onLogout,
 }) => {
@@ -71,7 +67,6 @@ export const FeedbackView: React.FC<FeedbackViewProps> = ({
   const [submitError, setSubmitError] = useState('');
   const [submittedNotice, setSubmittedNotice] = useState(false);
   const [deleteError, setDeleteError] = useState('');
-  const [sendingTestEmail, setSendingTestEmail] = useState(false);
   const [filter, setFilter] = useState<CategoryFilter>('ALL');
 
   const filteredEntries = useMemo(() => {
@@ -281,25 +276,6 @@ export const FeedbackView: React.FC<FeedbackViewProps> = ({
         </div>
 
         <div className="row">
-          <button
-            id="btn-feedback-test-email"
-            type="button"
-            className="btn btn-secondary btn-sm"
-            disabled={sendingTestEmail}
-            onClick={async () => {
-              setSendingTestEmail(true);
-              try {
-                await onSendTestEmail();
-              } finally {
-                setSendingTestEmail(false);
-              }
-            }}
-            title={`Odeslat testovací e-mail na ${FEEDBACK_NOTIFICATION_EMAIL}`}
-          >
-            <Mail size={14} />
-            {sendingTestEmail ? 'Odesílám…' : 'Test e-mailu'}
-          </button>
-
           <button
             id="btn-feedback-superadmin-logout"
             type="button"

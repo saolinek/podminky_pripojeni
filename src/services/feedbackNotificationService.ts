@@ -53,13 +53,3 @@ export async function sendFeedbackEmailNotification(input: {
     };
   }
 }
-
-export async function sendTestFeedbackEmail(): Promise<{ ok: boolean; message?: string }> {
-  return sendFeedbackEmailNotification({
-    category: 'JINE',
-    rating: 5,
-    authorName: 'Superadmin (test)',
-    message:
-      'Testovací oznámení z aplikace Připojení zdroje ČEZ. Pokud vám tento e-mail dorazil, e-mailová upozornění na novou zpětnou vazbu fungují.',
-  });
-}
