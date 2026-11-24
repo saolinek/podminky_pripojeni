@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import {
   type ChecklistItemTemplate,
+  type PhaseId,
   type PlantConfig,
 } from './types';
 import {
@@ -15,6 +16,7 @@ import {
   getSavedFirebaseConfig,
   loadLocalItems,
   removeChecklistItem,
+  reorderChecklistItems,
   seedDefaultsToFirestore,
   upsertChecklistItem,
 } from './services/firebaseService';
@@ -146,6 +148,25 @@ export function App() {
     showToast('Výchozí podmínky připojení ČEZ Distribuce byly obnoveny.');
   };
 
+  const handleReorderTemplateItems = async (
+    updates: { id: string; phase: PhaseId; order: number }[]
+  ) => {
+    if (updates.length === 0) return;
+    const byId = new Map(updates.map((u) => [u.id, u]));
+    setItems((prev) =>
+      prev
+        .map((it) => {
+          const u = byId.get(it.id);
+          return u ? { ...it, phase: u.phase, order: u.order } : it;
+        })
+        .sort((a, b) => a.order - b.order)
+    );
+    await reorderChecklistItems(updates);
+    if (dbState.mode === 'local') {
+      setItems(loadLocalItems());
+    }
+  };
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -213,6 +234,7 @@ export function App() {
             onClearInitialEdit={() => setEditingTemplateFromChecklist(null)}
             onSaveItem={handleSaveTemplateItem}
             onDeleteItem={handleDeleteTemplateItem}
+            onReorderItems={handleReorderTemplateItems}
             onResetDefaults={handleResetDefaults}
           />
         )}

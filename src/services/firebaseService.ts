@@ -24,7 +24,7 @@ import {
   type Firestore,
   type Timestamp,
 } from 'firebase/firestore';
-import type { ChecklistItemTemplate, SavedProject } from '../types';
+import type { ChecklistItemTemplate, PhaseId, SavedProject } from '../types';
 import { CEZ_DEFAULT_ITEMS } from '../data/cezDefaultItems';
 
 export interface FirebaseClientConfig {
@@ -501,8 +501,10 @@ export async function upsertChecklistItem(
 ): Promise<ChecklistItemTemplate> {
   const nowIso = new Date().toISOString();
   const uid = currentAuth?.currentUser?.uid || item.createdBy || 'local-user';
+  const safeDescription = item.description.trim() || item.title.trim();
   const updated: ChecklistItemTemplate = {
     ...item,
+    description: safeDescription,
     createdBy: isNew ? uid : item.createdBy || uid,
     updatedAtIso: nowIso,
   };
@@ -557,6 +559,35 @@ export async function upsertChecklistItem(
   }
 
   return updated;
+}
+
+export async function reorderChecklistItems(
+  updates: { id: string; phase: PhaseId; order: number }[]
+): Promise<void> {
+  if (updates.length === 0) return;
+
+  if (currentDb) {
+    const batch = writeBatch(currentDb);
+    for (const u of updates) {
+      const ref = doc(currentDb, 'checklist_items', u.id);
+      batch.update(ref, {
+        phase: u.phase,
+        order: u.order,
+        updatedAt: serverTimestamp(),
+      });
+    }
+    await batch.commit();
+  } else {
+    const byId = new Map(updates.map((u) => [u.id, u]));
+    const nowIso = new Date().toISOString();
+    const next = loadLocalItems()
+      .map((item) => {
+        const u = byId.get(item.id);
+        return u ? { ...item, phase: u.phase, order: u.order, updatedAtIso: nowIso } : item;
+      })
+      .sort((a, b) => a.order - b.order);
+    saveLocalItems(next);
+  }
 }
 
 export async function removeChecklistItem(id: string): Promise<void> {

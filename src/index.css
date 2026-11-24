@@ -1115,18 +1115,51 @@ h3 {
 }
 
 /* ---------- Database ---------- */
+.phase-header-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-right: 0.6rem;
+}
+
+.phase-header-bar .phase-header {
+  flex: 1;
+  min-width: 0;
+  padding-right: 0.5rem;
+}
+
+.phase-add-btn {
+  color: var(--ink-2);
+}
+
+.phase-add-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.phase-block.drop-target {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.phase-empty-drop {
+  padding: 0.85rem 1.1rem;
+  font-size: 0.8rem;
+  color: var(--ink-3);
+}
+
 .db-items-list {
   display: flex;
   flex-direction: column;
 }
 
 .db-item-row {
-  padding: 0.9rem 1.1rem;
+  padding: 0.72rem 1.1rem;
   border-bottom: 1px solid var(--border);
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
+  align-items: center;
+  gap: 0.6rem;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
 }
 
 .db-item-row:last-child {
@@ -1137,19 +1170,33 @@ h3 {
   background: #fcfcfc;
 }
 
-.db-item-row h3 {
-  font-size: 0.9rem;
-  font-weight: 550;
+.db-item-row.dragging {
+  opacity: 0.4;
 }
 
-.db-item-row p {
-  margin: 0.2rem 0 0;
-  font-size: 0.82rem;
+.db-item-row.drop-before {
+  box-shadow: inset 0 2px 0 0 var(--accent);
+  background: var(--accent-soft);
+}
+
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-3);
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+.db-item-row:hover .drag-handle {
   color: var(--ink-2);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+}
+
+.db-item-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .db-item-row .row-actions {
@@ -1162,6 +1209,16 @@ h3 {
 .db-item-row:hover .row-actions,
 .db-item-row .row-actions:focus-within {
   opacity: 1;
+}
+
+.icon-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.icon-btn:disabled:hover {
+  background: transparent;
+  color: var(--ink-3);
 }
 
 .tag-picker {
