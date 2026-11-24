@@ -1,8 +1,6 @@
 import { FEEDBACK_CATEGORIES, type FeedbackCategory } from '../types';
 
-export const FEEDBACK_NOTIFICATION_EMAIL = 'dobesmarek221@gmail.com';
-
-const FORMSUBMIT_ENDPOINT = `https://formsubmit.co/ajax/${encodeURIComponent(FEEDBACK_NOTIFICATION_EMAIL)}`;
+const FORMSUBMIT_ENDPOINT = 'https://formsubmit.co/ajax/42992a4356098d8f44dea0a9df4a6f90';
 const CATEGORY_LABEL_MAP = new Map(FEEDBACK_CATEGORIES.map((c) => [c.id, c.label]));
 
 interface FormSubmitResponse {
