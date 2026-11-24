@@ -510,10 +510,6 @@ export function App() {
         )}
       </main>
 
-      <footer className="app-footer">
-        ČEZ Distribuce · PPDS Příloha č. 4 &amp; RfG · Orientační pomůcka
-      </footer>
-
       {showAdminLoginModal && (
         <AdminLoginModal
           title={
