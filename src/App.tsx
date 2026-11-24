@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  CheckSquare,
-  Lock,
-  SlidersHorizontal,
-  Zap,
-} from 'lucide-react';
+import { CheckSquare, Lock, SlidersHorizontal, Zap } from 'lucide-react';
 import {
   type ChecklistItemTemplate,
+  type PhaseGroup,
   type PhaseId,
   type PlantConfig,
 } from './types';
@@ -17,11 +13,13 @@ import {
   type FirebaseClientConfig,
   getSavedFirebaseConfig,
   isFirebaseConnected,
+  loadLocalGroups,
   loadLocalItems,
   removeChecklistItem,
+  removeChecklistItemsByIds,
   reorderChecklistItems,
   saveAdminPasswordHash,
-  seedDefaultsToFirestore,
+  saveGroups,
   upsertChecklistItem,
 } from './services/firebaseService';
 import {
@@ -53,6 +51,7 @@ const DEFAULT_CONFIG: PlantConfig = {
 export function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('CHECKLIST');
   const [config, setConfig] = useState<PlantConfig>(DEFAULT_CONFIG);
+  const [groups, setGroups] = useState<PhaseGroup[]>(() => loadLocalGroups());
   const [items, setItems] = useState<ChecklistItemTemplate[]>(() => loadLocalItems());
 
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
@@ -91,7 +90,7 @@ export function App() {
 
   useEffect(() => {
     if (!toastMsg) return;
-    const t = window.setTimeout(() => setToastMsg(null), 3600);
+    const t = window.setTimeout(() => setToastMsg(null), 3200);
     return () => window.clearTimeout(t);
   }, [toastMsg]);
 
@@ -115,6 +114,7 @@ export function App() {
       await connectAndSubscribeFirebase(cfg, {
         onStateChange: (st) => setDbState(st),
         onItemsUpdate: (cloudItems) => setItems(cloudItems),
+        onGroupsUpdate: (cloudGroups) => setGroups(cloudGroups),
         onProjectsUpdate: () => {},
         onAdminHashUpdate: handleAdminHashSync,
       });
@@ -214,10 +214,9 @@ export function App() {
   };
 
   const handleToggleCheck = (itemId: string) => {
-    const next = checkedIds.includes(itemId)
-      ? checkedIds.filter((x) => x !== itemId)
-      : [...checkedIds, itemId];
-    setCheckedIds(next);
+    setCheckedIds((prev) =>
+      prev.includes(itemId) ? prev.filter((x) => x !== itemId) : [...prev, itemId]
+    );
   };
 
   const handleSaveItemNote = (itemId: string, note: string) => {
@@ -228,7 +227,7 @@ export function App() {
       delete nextNotes[itemId];
     }
     setItemNotes(nextNotes);
-    showToast('Poznámka u položky uložena.');
+    showToast('Poznámka uložena.');
   };
 
   const handleConfigChange = (nextConfig: PlantConfig) => {
@@ -239,7 +238,7 @@ export function App() {
     setConfig(DEFAULT_CONFIG);
     setCheckedIds([]);
     setItemNotes({});
-    showToast('Konfigurátor obnoven na výchozí hodnoty.');
+    showToast('Konfigurátor obnoven.');
   };
 
   const handleSaveTemplateItem = async (item: ChecklistItemTemplate, isNew: boolean) => {
@@ -252,11 +251,7 @@ export function App() {
       if (dbState.mode === 'local') {
         setItems(loadLocalItems());
       }
-      showToast(
-        isNew
-          ? `Nová podmínka „${item.title}“ přidána do databáze.`
-          : `Podmínka „${item.title}“ byla aktualizována.`
-      );
+      showToast(isNew ? `Přidáno: „${item.title}“` : `Uloženo: „${item.title}“`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       showToast(`Chyba při ukládání podmínky: ${msg}`);
@@ -274,27 +269,10 @@ export function App() {
       if (dbState.mode === 'local') {
         setItems(loadLocalItems());
       }
-      showToast('Podmínka odstraněna z databáze.');
+      showToast('Podmínka odstraněna.');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       showToast(`Chyba při mazání podmínky: ${msg}`);
-    }
-  };
-
-  const handleResetDefaults = async () => {
-    if (!adminRole) {
-      showToast('Úpravy podmínek vyžadují přihlášení správce.');
-      return;
-    }
-    try {
-      await seedDefaultsToFirestore();
-      if (dbState.mode === 'local') {
-        setItems(loadLocalItems());
-      }
-      showToast('Výchozí podmínky připojení ČEZ Distribuce byly obnoveny.');
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      showToast(`Chyba při obnovení podmínek: ${msg}`);
     }
   };
 
@@ -318,6 +296,43 @@ export function App() {
     await reorderChecklistItems(updates);
     if (dbState.mode === 'local') {
       setItems(loadLocalItems());
+    }
+  };
+
+  const handleSaveGroups = async (nextGroups: PhaseGroup[], toastText?: string) => {
+    if (!adminRole) {
+      showToast('Úpravy skupin vyžadují přihlášení správce.');
+      return;
+    }
+    try {
+      setGroups(nextGroups);
+      await saveGroups(nextGroups);
+      if (toastText) showToast(toastText);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(`Chyba při ukládání skupin: ${msg}`);
+    }
+  };
+
+  const handleDeleteGroup = async (groupId: string) => {
+    if (!adminRole) {
+      showToast('Úpravy skupin vyžadují přihlášení správce.');
+      return;
+    }
+    try {
+      const itemIdsToDelete = items.filter((i) => i.phase === groupId).map((i) => i.id);
+      const nextGroups = groups.filter((g) => g.id !== groupId);
+      setGroups(nextGroups);
+      setItems((prev) => prev.filter((i) => i.phase !== groupId));
+      await removeChecklistItemsByIds(itemIdsToDelete);
+      await saveGroups(nextGroups);
+      if (dbState.mode === 'local') {
+        setItems(loadLocalItems());
+      }
+      showToast('Skupina odstraněna.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(`Chyba při mazání skupiny: ${msg}`);
     }
   };
 
@@ -370,6 +385,7 @@ export function App() {
 
             <ChecklistView
               config={config}
+              groups={groups}
               allItems={items}
               checkedIds={checkedIds}
               itemNotes={itemNotes}
@@ -390,6 +406,7 @@ export function App() {
 
         {showingDatabase && adminRole && (
           <TemplateDatabaseView
+            groups={groups}
             items={items}
             adminRole={adminRole}
             editingInitialItem={editingTemplateFromChecklist}
@@ -397,7 +414,8 @@ export function App() {
             onSaveItem={handleSaveTemplateItem}
             onDeleteItem={handleDeleteTemplateItem}
             onReorderItems={handleReorderTemplateItems}
-            onResetDefaults={handleResetDefaults}
+            onSaveGroups={handleSaveGroups}
+            onDeleteGroup={handleDeleteGroup}
             onOpenChangePassword={() => setShowChangePasswordModal(true)}
             onLogout={handleAdminLogout}
           />

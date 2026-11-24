@@ -10,13 +10,14 @@ import {
 import {
   type ChecklistItemTemplate,
   matchesPlantConfig,
-  PHASES,
+  type PhaseGroup,
   type PhaseId,
   type PlantConfig,
 } from '../types';
 
 interface ChecklistViewProps {
   config: PlantConfig;
+  groups: PhaseGroup[];
   allItems: ChecklistItemTemplate[];
   checkedIds: string[];
   itemNotes: Record<string, string>;
@@ -30,6 +31,7 @@ type StatusFilter = 'ALL' | 'TODO' | 'DONE';
 
 export const ChecklistView: React.FC<ChecklistViewProps> = ({
   config,
+  groups,
   allItems,
   checkedIds,
   itemNotes,
@@ -44,11 +46,13 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
 
+  const groupIdSet = useMemo(() => new Set(groups.map((g) => g.id)), [groups]);
+
   const matchingItems = useMemo(() => {
     return allItems
-      .filter((item) => matchesPlantConfig(item, config))
+      .filter((item) => groupIdSet.has(item.phase) && matchesPlantConfig(item, config))
       .sort((a, b) => a.order - b.order);
-  }, [allItems, config]);
+  }, [allItems, config, groupIdSet]);
 
   const checkedSet = useMemo(() => new Set(checkedIds), [checkedIds]);
 
@@ -68,8 +72,6 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
       if (!q) return true;
       return (
         item.title.toLowerCase().includes(q) ||
-        item.description.toLowerCase().includes(q) ||
-        item.reference.toLowerCase().includes(q) ||
         (itemNotes[item.id] || '').toLowerCase().includes(q)
       );
     });
@@ -157,7 +159,7 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
         </div>
       ) : (
         <div className="phases-stack">
-          {PHASES.map((phase) => {
+          {groups.map((phase, groupIdx) => {
             const phaseItems = filteredItems.filter((i) => i.phase === phase.id);
             if (phaseItems.length === 0) return null;
 
@@ -177,7 +179,7 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
                 >
                   <div className="phase-header-left">
                     <span className={`phase-step-num ${phaseAllDone ? 'done' : ''}`}>
-                      {phaseAllDone ? <Check size={13} strokeWidth={3} /> : phase.step}
+                      {phaseAllDone ? <Check size={13} strokeWidth={3} /> : groupIdx + 1}
                     </span>
                     <h3 className="phase-title">{phase.title}</h3>
                   </div>

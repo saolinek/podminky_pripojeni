@@ -1115,6 +1115,40 @@ h3 {
 }
 
 /* ---------- Database ---------- */
+.btn-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 0.32rem;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.filter-panel {
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.filter-row-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
 .phase-header-bar {
   display: flex;
   align-items: center;
@@ -1126,6 +1160,12 @@ h3 {
   flex: 1;
   min-width: 0;
   padding-right: 0.5rem;
+}
+
+.phase-group-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
 }
 
 .phase-add-btn {
@@ -1447,8 +1487,10 @@ h3 {
     padding: 1rem;
   }
 
-  .form-row-2 {
+  .form-row-2,
+  .filter-row {
     grid-template-columns: 1fr;
+    gap: 0.35rem;
   }
 
   .item-actions,

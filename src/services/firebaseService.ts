@@ -25,7 +25,15 @@ import {
   type Firestore,
   type Timestamp,
 } from 'firebase/firestore';
-import type { ChecklistItemTemplate, PhaseId, SavedProject } from '../types';
+import {
+  BUILTIN_PHASE_IDS,
+  type BuiltInPhaseId,
+  type ChecklistItemTemplate,
+  PHASES,
+  type PhaseGroup,
+  type PhaseId,
+  type SavedProject,
+} from '../types';
 import { CEZ_DEFAULT_ITEMS } from '../data/cezDefaultItems';
 import { saveCachedAdminHash } from './adminAuthService';
 
@@ -50,8 +58,12 @@ export interface DbConnectionState {
 
 const LS_FIREBASE_CFG = 'cez_pripojeni_firebase_cfg_v1';
 const LS_ITEMS_KEY = 'cez_pripojeni_items_v1';
+const LS_GROUPS_KEY = 'cez_pripojeni_groups_v1';
 const LS_PROJECTS_KEY = 'cez_pripojeni_projects_v1';
 const ADMIN_CONFIG_DOC_ID = 'sys_admin_config';
+
+const GROUPS_META_DOC_ID = 'meta_groups_v1';
+const CUSTOM_GROUP_PREFIX = 'grp:';
 
 let currentApp: FirebaseApp | null = null;
 let currentAuth: Auth | null = null;
@@ -60,6 +72,61 @@ let currentConfig: FirebaseClientConfig | null = null;
 let unsubItems: (() => void) | null = null;
 let unsubProjects: (() => void) | null = null;
 let unsubAdminConfig: (() => void) | null = null;
+let groupsDocExistsInFirestore = false;
+
+function isBuiltInPhase(phase: string): phase is BuiltInPhaseId {
+  return (BUILTIN_PHASE_IDS as readonly string[]).includes(phase);
+}
+
+function encodePhaseForFirestore(
+  phase: PhaseId,
+  existingBadge = ''
+): { phase: BuiltInPhaseId; deadlineBadge: string } {
+  if (isBuiltInPhase(phase)) {
+    return {
+      phase,
+      deadlineBadge: existingBadge.startsWith(CUSTOM_GROUP_PREFIX) ? '' : existingBadge,
+    };
+  }
+  return {
+    phase: 'FAZE_1_PRIPRAVA',
+    deadlineBadge: `${CUSTOM_GROUP_PREFIX}${phase}`.slice(0, 100),
+  };
+}
+
+function decodePhaseFromFirestore(
+  rawPhase: unknown,
+  rawBadge: unknown
+): { phase: PhaseId; deadlineBadge: string } {
+  const badge = String(rawBadge || '');
+  if (badge.startsWith(CUSTOM_GROUP_PREFIX)) {
+    return { phase: badge.slice(CUSTOM_GROUP_PREFIX.length), deadlineBadge: '' };
+  }
+  return { phase: String(rawPhase || 'FAZE_1_PRIPRAVA'), deadlineBadge: badge };
+}
+
+export function getDefaultGroups(): PhaseGroup[] {
+  return PHASES.map(({ id, title }) => ({ id, title }));
+}
+
+export function loadLocalGroups(): PhaseGroup[] {
+  try {
+    const raw = localStorage.getItem(LS_GROUPS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as PhaseGroup[];
+      if (Array.isArray(parsed) && parsed.every((g) => g && typeof g.id === 'string' && typeof g.title === 'string')) {
+        return parsed;
+      }
+    }
+  } catch {
+    // Ignore corrupted storage
+  }
+  return getDefaultGroups();
+}
+
+export function saveLocalGroups(groups: PhaseGroup[]): void {
+  localStorage.setItem(LS_GROUPS_KEY, JSON.stringify(groups));
+}
 
 const DEFAULT_FIREBASE_CONFIG: FirebaseClientConfig = {
   apiKey: 'AIzaSyD1fby84nt24fZEF2MUYs793KFOc-fWfrU',
@@ -284,6 +351,7 @@ export async function connectAndSubscribeFirebase(
     onItemsUpdate: (items: ChecklistItemTemplate[]) => void;
     onProjectsUpdate: (projects: SavedProject[]) => void;
     onAdminHashUpdate?: (hash: string | null) => void;
+    onGroupsUpdate?: (groups: PhaseGroup[]) => void;
   }
 ): Promise<void> {
   if (unsubItems) {
@@ -298,6 +366,7 @@ export async function connectAndSubscribeFirebase(
     unsubAdminConfig();
     unsubAdminConfig = null;
   }
+  groupsDocExistsInFirestore = false;
 
   for (const existing of getApps()) {
     await deleteApp(existing);
@@ -374,16 +443,36 @@ export async function connectAndSubscribeFirebase(
     itemsQuery,
     (snapshot) => {
       const items: ChecklistItemTemplate[] = [];
+      let foundGroupsMeta = false;
+
       snapshot.forEach((docSnap) => {
         const d = docSnap.data();
+        if (docSnap.id === GROUPS_META_DOC_ID) {
+          foundGroupsMeta = true;
+          try {
+            const parsed = JSON.parse(String(d.description || '')) as PhaseGroup[];
+            if (
+              Array.isArray(parsed) &&
+              parsed.every((g) => g && typeof g.id === 'string' && typeof g.title === 'string')
+            ) {
+              saveLocalGroups(parsed);
+              callbacks.onGroupsUpdate?.(parsed);
+            }
+          } catch {
+            // Ignore malformed groups metadata
+          }
+          return;
+        }
+
+        const decoded = decodePhaseFromFirestore(d.phase, d.deadlineBadge);
         items.push({
           id: docSnap.id,
           title: String(d.title || ''),
           description: String(d.description || ''),
-          phase: d.phase,
+          phase: decoded.phase,
           order: Number(d.order ?? 100),
           reference: String(d.reference || ''),
-          deadlineBadge: String(d.deadlineBadge || ''),
+          deadlineBadge: decoded.deadlineBadge,
           mandatory: Boolean(d.mandatory ?? true),
           categories: Array.isArray(d.categories) ? d.categories : [],
           voltages: Array.isArray(d.voltages) ? d.voltages : [],
@@ -394,9 +483,9 @@ export async function connectAndSubscribeFirebase(
           updatedAtIso: timestampToIso(d.updatedAt),
         });
       });
-      if (items.length > 0) {
-        saveLocalItems(items);
-      }
+
+      groupsDocExistsInFirestore = foundGroupsMeta;
+      saveLocalItems(items);
       callbacks.onItemsUpdate(items);
       callbacks.onStateChange({
         mode: 'firebase',
@@ -545,14 +634,15 @@ export async function upsertChecklistItem(
 
   if (currentDb) {
     const ref = doc(currentDb, 'checklist_items', updated.id);
+    const encoded = encodePhaseForFirestore(updated.phase, updated.deadlineBadge);
     if (isNew) {
       await setDoc(ref, {
         title: updated.title,
         description: updated.description,
-        phase: updated.phase,
+        phase: encoded.phase,
         order: updated.order,
         reference: updated.reference,
-        deadlineBadge: updated.deadlineBadge,
+        deadlineBadge: encoded.deadlineBadge,
         mandatory: updated.mandatory,
         categories: updated.categories,
         voltages: updated.voltages,
@@ -567,10 +657,10 @@ export async function upsertChecklistItem(
       await updateDoc(ref, {
         title: updated.title,
         description: updated.description,
-        phase: updated.phase,
+        phase: encoded.phase,
         order: updated.order,
         reference: updated.reference,
-        deadlineBadge: updated.deadlineBadge,
+        deadlineBadge: encoded.deadlineBadge,
         mandatory: updated.mandatory,
         categories: updated.categories,
         voltages: updated.voltages,
@@ -604,8 +694,10 @@ export async function reorderChecklistItems(
     const batch = writeBatch(currentDb);
     for (const u of updates) {
       const ref = doc(currentDb, 'checklist_items', u.id);
+      const encoded = encodePhaseForFirestore(u.phase);
       batch.update(ref, {
-        phase: u.phase,
+        phase: encoded.phase,
+        deadlineBadge: encoded.deadlineBadge,
         order: u.order,
         updatedAt: serverTimestamp(),
       });
@@ -682,6 +774,65 @@ export async function saveAdminPasswordHash(newHash: string): Promise<void> {
     });
   }
   saveCachedAdminHash(newHash);
+}
+
+export async function removeChecklistItemsByIds(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  if (currentDb) {
+    const batch = writeBatch(currentDb);
+    for (const id of ids) {
+      batch.delete(doc(currentDb, 'checklist_items', id));
+    }
+    await batch.commit();
+  } else {
+    const idSet = new Set(ids);
+    const next = loadLocalItems().filter((i) => !idSet.has(i.id));
+    saveLocalItems(next);
+  }
+}
+
+export async function saveGroups(groups: PhaseGroup[]): Promise<void> {
+  saveLocalGroups(groups);
+  if (!currentDb) return;
+
+  const ref = doc(currentDb, 'checklist_items', GROUPS_META_DOC_ID);
+  const serialized = JSON.stringify(groups);
+  const uid = currentAuth?.currentUser?.uid || 'local-user';
+
+  if (groupsDocExistsInFirestore) {
+    await updateDoc(ref, {
+      description: serialized,
+      updatedAt: serverTimestamp(),
+    });
+  } else {
+    try {
+      await setDoc(ref, {
+        title: '__groups__',
+        description: serialized,
+        phase: 'FAZE_1_PRIPRAVA',
+        order: 0,
+        reference: '',
+        deadlineBadge: '',
+        mandatory: true,
+        categories: [],
+        voltages: [],
+        technologies: [],
+        exportModes: [],
+        requiredFlags: [],
+        createdBy: uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      groupsDocExistsInFirestore = true;
+    } catch {
+      // Document may have been created concurrently by another user; fall back to updateDoc
+      await updateDoc(ref, {
+        description: serialized,
+        updatedAt: serverTimestamp(),
+      });
+      groupsDocExistsInFirestore = true;
+    }
+  }
 }
 
 export async function upsertSavedProject(

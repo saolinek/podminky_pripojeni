@@ -6,13 +6,29 @@ export type ExportMode =
   | 'MIKROZDROJ_BEZ_PRETOKU'
   | 'NULOVY_REZERVOVANY_VYKON';
 
-export type PhaseId =
+export type BuiltInPhaseId =
   | 'FAZE_1_PRIPRAVA'
   | 'FAZE_2_ZADOST_SOP'
   | 'FAZE_3_PROJEKT_POVOLENI'
   | 'FAZE_4_REALIZACE_MERENI'
   | 'FAZE_5_UVEDENI_DO_PROVOZU'
   | 'FAZE_6_OTE_OBCHODNIK';
+
+export const BUILTIN_PHASE_IDS: readonly BuiltInPhaseId[] = [
+  'FAZE_1_PRIPRAVA',
+  'FAZE_2_ZADOST_SOP',
+  'FAZE_3_PROJEKT_POVOLENI',
+  'FAZE_4_REALIZACE_MERENI',
+  'FAZE_5_UVEDENI_DO_PROVOZU',
+  'FAZE_6_OTE_OBCHODNIK',
+];
+
+export type PhaseId = string;
+
+export interface PhaseGroup {
+  id: PhaseId;
+  title: string;
+}
 
 export type SpecialFlag =
   | 'CIZI_NEMOVITOST'
