@@ -1462,13 +1462,6 @@ h3 {
   margin: 0 auto;
 }
 
-.feedback-grid {
-  display: grid;
-  grid-template-columns: 380px minmax(0, 1fr);
-  gap: 1.5rem;
-  align-items: start;
-}
-
 .feedback-toolbar {
   margin-bottom: 1rem;
 }
@@ -1619,8 +1612,7 @@ h3 {
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1024px) {
-  .workspace-grid,
-  .feedback-grid {
+  .workspace-grid {
     grid-template-columns: 1fr;
   }
 
