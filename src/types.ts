@@ -82,6 +82,29 @@ export interface SavedProject {
   updatedAtIso: string;
 }
 
+export type FeedbackCategory = 'NAPAD' | 'CHYBA' | 'PODMINKA' | 'JINE';
+
+export interface FeedbackEntry {
+  id: string;
+  category: FeedbackCategory;
+  rating: number;
+  message: string;
+  authorName: string;
+  createdBy: string;
+  createdAtIso: string;
+}
+
+export const FEEDBACK_CATEGORIES: {
+  id: FeedbackCategory;
+  label: string;
+  shortLabel: string;
+}[] = [
+  { id: 'NAPAD', label: 'Nápad na vylepšení', shortLabel: 'Nápad' },
+  { id: 'CHYBA', label: 'Chyba / problém', shortLabel: 'Chyba' },
+  { id: 'PODMINKA', label: 'Chybějící podmínka', shortLabel: 'Podmínka' },
+  { id: 'JINE', label: 'Obecná zpráva', shortLabel: 'Ostatní' },
+];
+
 export const POWER_CATEGORIES: {
   id: PowerCategory;
   label: string;

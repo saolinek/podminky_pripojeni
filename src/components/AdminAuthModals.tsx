@@ -6,11 +6,15 @@ import {
 } from '../services/adminAuthService';
 
 interface AdminLoginModalProps {
+  title?: string;
+  description?: string;
   onClose: () => void;
   onAuthenticate: (password: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
+  title = 'Přístup do záložky Podmínky',
+  description = 'Úprava podmínek připojení je vyhrazena pouze pro správce. Zadejte heslo admina.',
   onClose,
   onAuthenticate,
 }) => {
@@ -61,7 +65,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
         <div className="modal-header">
           <h3 id="admin-login-title" className="modal-title-with-icon">
             <Lock size={17} />
-            Přístup do záložky Podmínky
+            {title}
           </h3>
           <button
             type="button"
@@ -74,9 +78,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
         </div>
 
         <div className="modal-body">
-          <p className="modal-lead">
-            Úprava podmínek připojení je vyhrazena pouze pro správce. Zadejte heslo admina.
-          </p>
+          <p className="modal-lead">{description}</p>
 
           <div className="field-group">
             <label className="field-label" htmlFor="input-admin-login-password">

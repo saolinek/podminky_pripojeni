@@ -29,6 +29,8 @@ import {
   BUILTIN_PHASE_IDS,
   type BuiltInPhaseId,
   type ChecklistItemTemplate,
+  type FeedbackCategory,
+  type FeedbackEntry,
   PHASES,
   type PhaseGroup,
   type PhaseId,
@@ -60,7 +62,9 @@ const LS_FIREBASE_CFG = 'cez_pripojeni_firebase_cfg_v1';
 const LS_ITEMS_KEY = 'cez_pripojeni_items_v1';
 const LS_GROUPS_KEY = 'cez_pripojeni_groups_v1';
 const LS_PROJECTS_KEY = 'cez_pripojeni_projects_v1';
+const LS_FEEDBACK_KEY = 'cez_pripojeni_feedback_v1';
 const ADMIN_CONFIG_DOC_ID = 'sys_admin_config';
+const FEEDBACK_DOC_PREFIX = 'fb-';
 
 const GROUPS_META_DOC_ID = 'meta_groups_v1';
 const CUSTOM_GROUP_PREFIX = 'grp:';
@@ -305,6 +309,23 @@ export function saveLocalProjects(projects: SavedProject[]): void {
   localStorage.setItem(LS_PROJECTS_KEY, JSON.stringify(projects));
 }
 
+export function loadLocalFeedback(): FeedbackEntry[] {
+  try {
+    const raw = localStorage.getItem(LS_FEEDBACK_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as FeedbackEntry[];
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {
+    // Ignore
+  }
+  return [];
+}
+
+export function saveLocalFeedback(entries: FeedbackEntry[]): void {
+  localStorage.setItem(LS_FEEDBACK_KEY, JSON.stringify(entries));
+}
+
 function timestampToIso(val: unknown): string {
   if (val && typeof val === 'object' && 'toDate' in val && typeof (val as Timestamp).toDate === 'function') {
     return (val as Timestamp).toDate().toISOString();
@@ -352,6 +373,7 @@ export async function connectAndSubscribeFirebase(
     onProjectsUpdate: (projects: SavedProject[]) => void;
     onAdminHashUpdate?: (hash: string | null) => void;
     onGroupsUpdate?: (groups: PhaseGroup[]) => void;
+    onFeedbackUpdate?: (entries: FeedbackEntry[]) => void;
   }
 ): Promise<void> {
   if (unsubItems) {
@@ -532,9 +554,28 @@ export async function connectAndSubscribeFirebase(
     projectsQuery,
     (snapshot) => {
       const projects: SavedProject[] = [];
+      const feedbackEntries: FeedbackEntry[] = [];
       snapshot.forEach((docSnap) => {
         if (docSnap.id === ADMIN_CONFIG_DOC_ID) return;
         const d = docSnap.data();
+        if (docSnap.id.startsWith(FEEDBACK_DOC_PREFIX)) {
+          const notes = d.itemNotes && typeof d.itemNotes === 'object' ? d.itemNotes : {};
+          const rawCat = String(d.contractNumber || '');
+          const validCategory: FeedbackCategory =
+            rawCat === 'NAPAD' || rawCat === 'CHYBA' || rawCat === 'PODMINKA' || rawCat === 'JINE'
+              ? rawCat
+              : 'JINE';
+          feedbackEntries.push({
+            id: docSnap.id,
+            category: validCategory,
+            rating: Number.isFinite(Number(d.installedPowerKw)) ? Number(d.installedPowerKw) : 0,
+            message: String((notes as Record<string, unknown>).message || ''),
+            authorName: String((notes as Record<string, unknown>).authorName || ''),
+            createdBy: String(d.createdBy || ''),
+            createdAtIso: timestampToIso(d.createdAt),
+          });
+          return;
+        }
         projects.push({
           id: docSnap.id,
           name: String(d.name || 'Nepojmenovaný zdroj'),
@@ -554,7 +595,9 @@ export async function connectAndSubscribeFirebase(
         });
       });
       saveLocalProjects(projects);
+      saveLocalFeedback(feedbackEntries);
       callbacks.onProjectsUpdate(projects);
+      callbacks.onFeedbackUpdate?.(feedbackEntries);
     },
     (err) => {
       callbacks.onStateChange({
@@ -956,4 +999,79 @@ export async function syncLocalItemsAndProjectsToCloud(
   }
 
   await batch.commit();
+}
+
+export async function submitFeedback(input: {
+  category: FeedbackCategory;
+  rating: number;
+  message: string;
+  authorName: string;
+}): Promise<FeedbackEntry> {
+  const trimmedMessage = input.message.trim().slice(0, 2000);
+  if (!trimmedMessage) {
+    throw new Error('Zpráva zpětné vazby nesmí být prázdná.');
+  }
+
+  const trimmedAuthor = input.authorName.trim().slice(0, 120);
+  const safeRating = Math.max(0, Math.min(5, Math.round(input.rating)));
+  const id = `${FEEDBACK_DOC_PREFIX}${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const nowIso = new Date().toISOString();
+
+  if (currentDb) {
+    const uid = currentAuth?.currentUser?.uid;
+    if (!uid) {
+      throw new Error('Databáze není přihlášena, zpětnou vazbu nelze odeslat.');
+    }
+    const ref = doc(currentDb, 'projects', id);
+    await setDoc(ref, {
+      name: '__feedback__',
+      contractNumber: input.category,
+      eanCode: '',
+      installedPowerKw: safeRating,
+      category: 'MIKROZDROJ',
+      voltage: 'NN',
+      technology: 'FVE',
+      exportMode: 'STANDARD_PRETOKY',
+      flags: [],
+      checkedIds: [],
+      itemNotes: {
+        message: trimmedMessage,
+        authorName: trimmedAuthor,
+      },
+      createdBy: uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    return {
+      id,
+      category: input.category,
+      rating: safeRating,
+      message: trimmedMessage,
+      authorName: trimmedAuthor,
+      createdBy: uid,
+      createdAtIso: nowIso,
+    };
+  }
+
+  const entry: FeedbackEntry = {
+    id,
+    category: input.category,
+    rating: safeRating,
+    message: trimmedMessage,
+    authorName: trimmedAuthor,
+    createdBy: 'local-user',
+    createdAtIso: nowIso,
+  };
+  const current = loadLocalFeedback();
+  saveLocalFeedback([entry, ...current]);
+  return entry;
+}
+
+export async function removeFeedback(id: string): Promise<void> {
+  if (currentDb) {
+    await deleteDoc(doc(currentDb, 'projects', id));
+  } else {
+    const next = loadLocalFeedback().filter((f) => f.id !== id);
+    saveLocalFeedback(next);
+  }
 }

@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckSquare, Lock, SlidersHorizontal, Zap } from 'lucide-react';
+import {
+  CheckSquare,
+  Lock,
+  MessageSquare,
+  SlidersHorizontal,
+  Zap,
+} from 'lucide-react';
 import {
   type ChecklistItemTemplate,
+  type FeedbackCategory,
+  type FeedbackEntry,
   type PhaseGroup,
   type PhaseId,
   type PlantConfig,
@@ -13,13 +21,16 @@ import {
   type FirebaseClientConfig,
   getSavedFirebaseConfig,
   isFirebaseConnected,
+  loadLocalFeedback,
   loadLocalGroups,
   loadLocalItems,
   removeChecklistItem,
   removeChecklistItemsByIds,
+  removeFeedback,
   reorderChecklistItems,
   saveAdminPasswordHash,
   saveGroups,
+  submitFeedback,
   upsertChecklistItem,
 } from './services/firebaseService';
 import {
@@ -35,9 +46,11 @@ import {
 import { PlantConfigurator } from './components/PlantConfigurator';
 import { ChecklistView } from './components/ChecklistView';
 import { TemplateDatabaseView } from './components/TemplateDatabaseView';
+import { FeedbackView } from './components/FeedbackView';
 import { AdminLoginModal, ChangePasswordModal } from './components/AdminAuthModals';
 
-type ActiveTab = 'CHECKLIST' | 'DATABASE';
+type ActiveTab = 'CHECKLIST' | 'DATABASE' | 'FEEDBACK';
+type LoginIntent = 'DATABASE' | 'FEEDBACK';
 
 const DEFAULT_CONFIG: PlantConfig = {
   installedPowerKw: 9.9,
@@ -53,6 +66,9 @@ export function App() {
   const [config, setConfig] = useState<PlantConfig>(DEFAULT_CONFIG);
   const [groups, setGroups] = useState<PhaseGroup[]>(() => loadLocalGroups());
   const [items, setItems] = useState<ChecklistItemTemplate[]>(() => loadLocalItems());
+  const [feedbackEntries, setFeedbackEntries] = useState<FeedbackEntry[]>(() =>
+    loadLocalFeedback()
+  );
 
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [itemNotes, setItemNotes] = useState<Record<string, string>>({});
@@ -73,6 +89,7 @@ export function App() {
   );
   const adminRoleRef = useRef<AdminRole | null>(adminRole);
   const [showAdminLoginModal, setShowAdminLoginModal] = useState(false);
+  const [loginIntent, setLoginIntent] = useState<LoginIntent>('DATABASE');
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   const [editingTemplateFromChecklist, setEditingTemplateFromChecklist] =
@@ -102,7 +119,7 @@ export function App() {
         clearAdminSession();
         setAdminRole(null);
         setShowChangePasswordModal(false);
-        setActiveTab('CHECKLIST');
+        setActiveTab((prev) => (prev === 'DATABASE' ? 'CHECKLIST' : prev));
         showToast('Heslo admina bylo změněno. Přihlaste se prosím znovu.');
       }
     },
@@ -117,6 +134,7 @@ export function App() {
         onGroupsUpdate: (cloudGroups) => setGroups(cloudGroups),
         onProjectsUpdate: () => {},
         onAdminHashUpdate: handleAdminHashSync,
+        onFeedbackUpdate: (cloudFeedback) => setFeedbackEntries(cloudFeedback),
       });
     },
     [handleAdminHashSync]
@@ -142,8 +160,14 @@ export function App() {
     if (adminRole) {
       setActiveTab('DATABASE');
     } else {
+      setLoginIntent('DATABASE');
       setShowAdminLoginModal(true);
     }
+  };
+
+  const handleOpenFeedbackSuperadminLogin = () => {
+    setLoginIntent('FEEDBACK');
+    setShowAdminLoginModal(true);
   };
 
   const handleAdminLogin = async (
@@ -165,10 +189,21 @@ export function App() {
       return { ok: false, error: 'Nesprávné heslo.' };
     }
 
+    if (loginIntent === 'FEEDBACK' && role !== 'superadmin') {
+      return {
+        ok: false,
+        error: 'Zobrazení přijaté zpětné vazby vyžaduje heslo superadmina.',
+      };
+    }
+
     saveAdminSession(role, latestHash);
     setAdminRole(role);
     setShowAdminLoginModal(false);
-    setActiveTab('DATABASE');
+    if (loginIntent === 'DATABASE') {
+      setActiveTab('DATABASE');
+    } else {
+      setActiveTab('FEEDBACK');
+    }
     showToast(role === 'superadmin' ? 'Přihlášen jako superadmin.' : 'Přihlášen jako admin.');
     return { ok: true };
   };
@@ -209,7 +244,7 @@ export function App() {
     setAdminRole(null);
     setEditingTemplateFromChecklist(null);
     setShowChangePasswordModal(false);
-    setActiveTab('CHECKLIST');
+    setActiveTab((prev) => (prev === 'DATABASE' ? 'CHECKLIST' : prev));
     showToast('Správce byl odhlášen.');
   };
 
@@ -336,7 +371,35 @@ export function App() {
     }
   };
 
+  const handleSubmitFeedback = async (input: {
+    category: FeedbackCategory;
+    rating: number;
+    message: string;
+    authorName: string;
+  }) => {
+    await submitFeedback(input);
+    if (dbState.mode === 'local') {
+      setFeedbackEntries(loadLocalFeedback());
+    }
+    showToast('Děkujeme! Zpětná vazba byla uložena.');
+  };
+
+  const handleDeleteFeedback = async (id: string) => {
+    if (adminRole !== 'superadmin') {
+      showToast('Odstranění zpětné vazby je vyhrazeno pouze pro superadmina.');
+      return;
+    }
+    await removeFeedback(id);
+    if (dbState.mode === 'local') {
+      setFeedbackEntries(loadLocalFeedback());
+    }
+    showToast('Zpětná vazba byla odstraněna.');
+  };
+
+  const isSuperadmin = adminRole === 'superadmin';
   const showingDatabase = activeTab === 'DATABASE' && adminRole !== null;
+  const showingFeedback = activeTab === 'FEEDBACK';
+  const showingChecklist = !showingDatabase && !showingFeedback;
 
   return (
     <div className="app-shell">
@@ -353,7 +416,7 @@ export function App() {
             <button
               id="nav-tab-checklist"
               type="button"
-              className={`nav-tab ${!showingDatabase ? 'active' : ''}`}
+              className={`nav-tab ${showingChecklist ? 'active' : ''}`}
               onClick={() => setActiveTab('CHECKLIST')}
             >
               <CheckSquare size={15} />
@@ -370,12 +433,25 @@ export function App() {
               Podmínky
               <span className="nav-badge">{items.length}</span>
             </button>
+
+            <button
+              id="nav-tab-feedback"
+              type="button"
+              className={`nav-tab ${showingFeedback ? 'active' : ''}`}
+              onClick={() => setActiveTab('FEEDBACK')}
+            >
+              <MessageSquare size={15} />
+              Zpětná vazba
+              {isSuperadmin && feedbackEntries.length > 0 && (
+                <span className="nav-badge">{feedbackEntries.length}</span>
+              )}
+            </button>
           </nav>
         </div>
       </header>
 
       <main className="main-container">
-        {!showingDatabase && (
+        {showingChecklist && (
           <div className="workspace-grid">
             <PlantConfigurator
               config={config}
@@ -394,6 +470,7 @@ export function App() {
               onSaveItemNote={handleSaveItemNote}
               onEditTemplateItem={(item) => {
                 if (!adminRole) {
+                  setLoginIntent('DATABASE');
                   setShowAdminLoginModal(true);
                   return;
                 }
@@ -420,6 +497,17 @@ export function App() {
             onLogout={handleAdminLogout}
           />
         )}
+
+        {showingFeedback && (
+          <FeedbackView
+            isSuperadmin={isSuperadmin}
+            entries={feedbackEntries}
+            onSubmitFeedback={handleSubmitFeedback}
+            onDeleteFeedback={handleDeleteFeedback}
+            onOpenSuperadminLogin={handleOpenFeedbackSuperadminLogin}
+            onLogout={handleAdminLogout}
+          />
+        )}
       </main>
 
       <footer className="app-footer">
@@ -428,6 +516,16 @@ export function App() {
 
       {showAdminLoginModal && (
         <AdminLoginModal
+          title={
+            loginIntent === 'FEEDBACK'
+              ? 'Přehled zpětné vazby'
+              : 'Přístup do záložky Podmínky'
+          }
+          description={
+            loginIntent === 'FEEDBACK'
+              ? 'Zobrazení přijaté zpětné vazby je vyhrazeno pouze pro superadmina. Zadejte heslo superadmina.'
+              : 'Úprava podmínek připojení je vyhrazena pouze pro správce. Zadejte heslo admina.'
+          }
           onClose={() => setShowAdminLoginModal(false)}
           onAuthenticate={handleAdminLogin}
         />
