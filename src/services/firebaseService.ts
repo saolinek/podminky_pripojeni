@@ -57,6 +57,15 @@ let currentConfig: FirebaseClientConfig | null = null;
 let unsubItems: (() => void) | null = null;
 let unsubProjects: (() => void) | null = null;
 
+const DEFAULT_FIREBASE_CONFIG: FirebaseClientConfig = {
+  apiKey: 'AIzaSyD1fby84nt24fZEF2MUYs793KFOc-fWfrU',
+  authDomain: 'cez-podminky-pripojeni.firebaseapp.com',
+  projectId: 'cez-podminky-pripojeni',
+  storageBucket: 'cez-podminky-pripojeni.firebasestorage.app',
+  messagingSenderId: '401109942749',
+  appId: '1:401109942749:web:621f4ee4bcbb67f3b2b634',
+};
+
 function readEnvFirebaseConfig(): FirebaseClientConfig | null {
   const env = import.meta.env;
   if (env.VITE_FIREBASE_API_KEY && env.VITE_FIREBASE_PROJECT_ID && env.VITE_FIREBASE_APP_ID) {
@@ -131,7 +140,7 @@ export function getSavedFirebaseConfig(): FirebaseClientConfig | null {
     // Ignore storage read error
   }
 
-  return readEnvFirebaseConfig();
+  return readEnvFirebaseConfig() ?? DEFAULT_FIREBASE_CONFIG;
 }
 
 export function buildShareableUrlWithFirebase(cfg: FirebaseClientConfig): string {
