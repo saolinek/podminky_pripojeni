@@ -75,38 +75,38 @@ export const POWER_CATEGORIES: {
   {
     id: 'MIKROZDROJ',
     label: 'Mikrozdroj',
-    rangeLabel: 'do 10,8 kW (max. 16 A/fázi na NN)',
-    rfgDoc: 'Instalační dokument VM A1',
+    rangeLabel: '≤ 10,8 kW (NN)',
+    rfgDoc: 'VM A1',
   },
   {
     id: 'A1',
-    label: 'Kategorie A1',
-    rangeLabel: 'do 11 kW vč.',
-    rfgDoc: 'Instalační dokument VM A1',
+    label: 'A1',
+    rangeLabel: '≤ 11 kW',
+    rfgDoc: 'VM A1',
   },
   {
     id: 'A2',
-    label: 'Kategorie A2',
-    rangeLabel: 'nad 11 kW do 100 kW',
-    rfgDoc: 'Instalační dokument VM A2',
+    label: 'A2',
+    rangeLabel: '11–100 kW',
+    rfgDoc: 'VM A2',
   },
   {
     id: 'B1',
-    label: 'Kategorie B1',
-    rangeLabel: 'od 100 kW vč. do 1 MW',
-    rfgDoc: 'Dokument VM B1 + UPOS',
+    label: 'B1',
+    rangeLabel: '100 kW – 1 MW',
+    rfgDoc: 'VM B1 + UPOS',
   },
   {
     id: 'B2',
-    label: 'Kategorie B2',
-    rangeLabel: 'od 1 MW vč. do 30 MW',
-    rfgDoc: 'Dokument VM B2 + UPOS',
+    label: 'B2',
+    rangeLabel: '1–30 MW',
+    rfgDoc: 'VM B2 + UPOS',
   },
   {
     id: 'C_D',
-    label: 'Kategorie C / D',
-    rangeLabel: 'od 30 MW vč. (nebo 110 kV)',
-    rfgDoc: 'Dokument VM C/D + UPOS',
+    label: 'C / D',
+    rangeLabel: '≥ 30 MW / 110 kV',
+    rfgDoc: 'VM C/D + UPOS',
   },
 ];
 
@@ -115,9 +115,9 @@ export const VOLTAGE_LEVELS: {
   label: string;
   sub: string;
 }[] = [
-  { id: 'NN', label: 'NN', sub: '0,4 kV (nízké)' },
-  { id: 'VN', label: 'VN', sub: '22 / 35 kV (vysoké)' },
-  { id: 'VVN', label: 'VVN', sub: '110 kV (velmi vysoké)' },
+  { id: 'NN', label: 'NN', sub: '0,4 kV' },
+  { id: 'VN', label: 'VN', sub: '22 / 35 kV' },
+  { id: 'VVN', label: 'VVN', sub: '110 kV' },
 ];
 
 export const PLANT_TECHNOLOGIES: {
@@ -125,12 +125,12 @@ export const PLANT_TECHNOLOGIES: {
   label: string;
   sub: string;
 }[] = [
-  { id: 'FVE', label: 'FVE bez baterie', sub: 'Fotovoltaika se střídačem' },
-  { id: 'FVE_BESS', label: 'FVE + akumulace', sub: 'Hybridní FVE s BESS' },
-  { id: 'BESS', label: 'Samostatná BESS', sub: 'Bateriové úložiště (BSAE)' },
-  { id: 'KGJ', label: 'KGJ / Bioplyn', sub: 'Motorgenerátor / kogenerace' },
-  { id: 'MVE', label: 'MVE', sub: 'Malá vodní elektrárna' },
-  { id: 'VTE', label: 'VTE', sub: 'Větrná elektrárna' },
+  { id: 'FVE', label: 'FVE', sub: 'Fotovoltaika' },
+  { id: 'FVE_BESS', label: 'FVE + BESS', sub: 'Hybridní s baterií' },
+  { id: 'BESS', label: 'BESS', sub: 'Bateriové úložiště' },
+  { id: 'KGJ', label: 'KGJ / Bioplyn', sub: 'Kogenerace' },
+  { id: 'MVE', label: 'MVE', sub: 'Malá vodní' },
+  { id: 'VTE', label: 'VTE', sub: 'Větrná' },
 ];
 
 export const EXPORT_MODES: {
@@ -140,18 +140,18 @@ export const EXPORT_MODES: {
 }[] = [
   {
     id: 'STANDARD_PRETOKY',
-    label: 'Standardní připojení s přetoky do DS (Pr > 0 kW)',
-    sub: 'Možnost dodávky přetoků do sítě, výrobní EAN a výkup obchodníkem',
+    label: 'S přetoky (Pr > 0 kW)',
+    sub: 'Standardní připojení s dodávkou do DS',
   },
   {
     id: 'MIKROZDROJ_BEZ_PRETOKU',
-    label: 'Zjednodušené připojení mikrozdroje bez přetoků (§ 16)',
-    sub: 'Pouze do 10,8 kW na NN ve stávajícím OM, Pr = 0 kW, měření impedance smyčky',
+    label: 'Mikrozdroj bez přetoků (§ 16)',
+    sub: 'Do 10,8 kW na NN, Pr = 0 kW',
   },
   {
     id: 'NULOVY_REZERVOVANY_VYKON',
-    label: 'Standardní připojení s nulovým rezervovaným výkonem (Pr = 0 kW)',
-    sub: 'Pro zdroje s technickým omezením přetoků mimo zjednodušený režim § 16',
+    label: 'Bez přetoků (Pr = 0 kW)',
+    sub: 'Standardní připojení s nulovým Pr',
   },
 ];
 
@@ -164,38 +164,38 @@ export const PHASES: {
   {
     id: 'FAZE_1_PRIPRAVA',
     step: 1,
-    title: 'Příprava záměru a podklady před žádostí',
-    subtitle: 'Ověření kapacity sítě, vlastnických vztahů, schémat a parametrů odběrného místa',
+    title: 'Příprava a podklady',
+    subtitle: 'Kapacita sítě, vlastnictví, schémata',
   },
   {
     id: 'FAZE_2_ZADOST_SOP',
     step: 2,
-    title: 'Žádost o připojení a Smlouva o připojení (SoP / SoBS)',
-    subtitle: 'Podání v Distribučním portálu, posouzení sítě, podpis smlouvy a úhrada podílu',
+    title: 'Žádost a Smlouva o připojení',
+    subtitle: 'Distribuční portál, SoP / SoBS',
   },
   {
     id: 'FAZE_3_PROJEKT_POVOLENI',
     step: 3,
-    title: 'Projektová dokumentace, legislativa a povolení',
-    subtitle: 'Schválení PD ze strany ČEZ Distribuce, tabulka telemetrie, stavební řízení a licence ERÚ',
+    title: 'Projekt a povolení',
+    subtitle: 'PD, telemetrie, stavební řízení, licence ERÚ',
   },
   {
     id: 'FAZE_4_REALIZACE_MERENI',
     step: 4,
-    title: 'Technická realizace, měření, HDO / ŘJ a revize',
-    subtitle: 'Úprava elektroměrového rozváděče, ochrany, HDO nebo řídicí jednotka se SIM a výchozí revize',
+    title: 'Realizace, měření a revize',
+    subtitle: 'Rozváděč, ochrany, HDO / ŘJ, výchozí revize',
   },
   {
     id: 'FAZE_5_UVEDENI_DO_PROVOZU',
     step: 5,
-    title: 'Ověření souladu (RfG) a Umožnění trvalého provozu (UPOS / UTP)',
-    subtitle: 'Instalační dokument / Dokument VM, zkoušky, montáž 4Q elektroměru a Konečné provozní oznámení',
+    title: 'RfG a uvedení do provozu',
+    subtitle: 'Dokument VM, zkoušky, 4Q elektroměr, UPOS / UTP',
   },
   {
     id: 'FAZE_6_OTE_OBCHODNIK',
     step: 6,
-    title: 'Registrace OTE, smlouva s obchodníkem a trvalý provoz',
-    subtitle: 'Výrobní EAN, přenesení odpovědnosti za odchylku a povolení dodávky do distribuční sítě',
+    title: 'OTE a obchodník',
+    subtitle: 'Výrobní EAN, odchylka, trvalý provoz',
   },
 ];
 
@@ -206,28 +206,28 @@ export const SPECIAL_FLAGS: {
 }[] = [
   {
     id: 'CIZI_NEMOVITOST',
-    label: 'Výrobna na cizím pozemku / budově (nájem, věcné břemeno)',
-    hint: 'Vyžaduje Souhlas vlastníka nemovitosti dle vzoru ČEZ Distribuce',
+    label: 'Cizí pozemek / budova',
+    hint: 'Souhlas vlastníka nemovitosti',
   },
   {
     id: 'PLNA_MOC',
-    label: 'Podání vyřizuje zástupce / realizační firma na plnou moc',
-    hint: 'Vyžaduje Plnou moc pro zastupování u ČEZ Distribuce',
+    label: 'Zastoupení na plnou moc',
+    hint: 'Plná moc pro ČEZ Distribuce',
   },
   {
     id: 'OSTROVNI_PROVOZ',
-    label: 'Umožňuje ostrovní provoz (backup při výpadku DS)',
-    hint: 'Vyžaduje vazební spínač s ochranou a TN-S s proudovými chrániči',
+    label: 'Ostrovní provoz (backup)',
+    hint: 'Vazební spínač a ochrany TN-S',
   },
   {
     id: 'NAD_50_KW_LICENCE',
-    label: 'Instalovaný výkon nad 50 kW (licence ERÚ + stavební záměr)',
-    hint: 'Automaticky aktivováno při výkonu Pi > 50 kW',
+    label: 'Nad 50 kW (licence ERÚ)',
+    hint: 'Automaticky při Pi > 50 kW',
   },
   {
     id: 'NEPRIME_MERENI',
-    label: 'Nepřímé fakturační měření přes MTP / MTN (nad 80 A nebo VN/VVN)',
-    hint: 'Vyžaduje úředně ověřené měřicí transformátory proudu/napětí',
+    label: 'Nepřímé měření (MTP / MTN)',
+    hint: 'Nad 80 A nebo VN/VVN',
   },
 ];
 

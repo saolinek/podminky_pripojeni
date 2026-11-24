@@ -59,49 +59,36 @@ export const FirebaseSetupModal: React.FC<FirebaseSetupModalProps> = ({
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
-      <div className="modal-panel">
+      <div className="modal-panel" style={{ maxWidth: 520 }}>
         <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-            <Cloud size={20} color="var(--cez-orange)" />
-            <h3>Sdílená cloudová databáze Firebase Firestore</h3>
-          </div>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
+          <h3>Firebase Firestore</h3>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            aria-label="Zavřít"
+          >
             <X size={18} />
           </button>
         </div>
 
         <div className="modal-body">
-          {/* Status Banner */}
           {dbState.mode === 'firebase' && dbState.connected ? (
-            <div
-              className="reg-alert"
-              style={{
-                background: 'var(--status-ok-bg)',
-                border: '1px solid var(--status-ok-border)',
-                color: 'var(--status-ok)',
-                marginBottom: '1rem',
-              }}
-            >
-              <CheckCircle2 size={18} />
+            <div className="reg-alert ok" style={{ marginBottom: '1rem' }}>
+              <CheckCircle2 size={16} />
               <div style={{ flex: 1 }}>
-                <strong>Připojeno k Firebase Firestore ({dbState.projectId})</strong>
-                <div style={{ fontSize: '0.76rem', marginTop: '0.2rem' }}>
-                  Veškeré úpravy šablon i uložených projektů se v reálném čase synchronizují do
-                  sdílené databáze.{' '}
-                  {dbState.authEmail
-                    ? `Přihlášen: ${dbState.authEmail}`
-                    : dbState.uid
-                    ? `Relace ověřena (UID: ${dbState.uid.slice(0, 8)}…)`
-                    : ''}
+                <div>
+                  <strong>{dbState.projectId}</strong>
+                  {dbState.authEmail ? ` · ${dbState.authEmail}` : ''}
                 </div>
-                <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', marginTop: '0.6rem' }}>
+                <div className="row" style={{ marginTop: '0.6rem' }}>
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
                     onClick={handleCopyShareLink}
                   >
                     <Copy size={13} />
-                    Kopírovat sdílený odkaz pro kolegy
+                    Sdílet odkaz
                   </button>
                   <button
                     type="button"
@@ -110,7 +97,7 @@ export const FirebaseSetupModal: React.FC<FirebaseSetupModalProps> = ({
                       setBusy(true);
                       try {
                         await onSyncLocalToCloud();
-                        onShowToast('Lokální položky a projekty nahrány do Firestore!');
+                        onShowToast('Lokální data nahrána do cloudu.');
                       } catch (err: unknown) {
                         setFormError(err instanceof Error ? err.message : String(err));
                       } finally {
@@ -120,7 +107,7 @@ export const FirebaseSetupModal: React.FC<FirebaseSetupModalProps> = ({
                     disabled={busy}
                   >
                     <RefreshCw size={13} />
-                    Nahrát lokální data do cloudu
+                    Synchronizovat
                   </button>
                   {!dbState.authEmail && (
                     <button
@@ -129,14 +116,14 @@ export const FirebaseSetupModal: React.FC<FirebaseSetupModalProps> = ({
                       onClick={async () => {
                         try {
                           await signInWithGoogleFirebase();
-                          onShowToast('Přihlášení přes Google účet proběhlo úspěšně.');
+                          onShowToast('Přihlášeno přes Google.');
                         } catch (err: unknown) {
                           setFormError(err instanceof Error ? err.message : String(err));
                         }
                       }}
                     >
                       <LogIn size={13} />
-                      Přihlásit Google účtem
+                      Google účet
                     </button>
                   )}
                 </div>
@@ -144,21 +131,13 @@ export const FirebaseSetupModal: React.FC<FirebaseSetupModalProps> = ({
             </div>
           ) : (
             <div className="reg-alert info" style={{ marginBottom: '1rem' }}>
-              <Cloud size={18} />
-              <div>
-                <strong>Aplikace je plně připravena pro Firebase Firestore:</strong> Dokud níže
-                nevložíte konfiguraci <code>firebaseConfig</code> vašeho projektu (nebo proměnné{' '}
-                <code>VITE_FIREBASE_*</code>), ukládají se úpravy bezpečně v prohlížeči. Po vložení
-                konfigurace se databáze <strong>automaticky naplní všemi podmínkami ČEZ Distribuce</strong>!
-              </div>
+              <Cloud size={16} />
+              <span>Lokální režim. Vložte firebaseConfig pro sdílení v cloudu.</span>
             </div>
           )}
 
           {(dbState.error || formError) && (
-            <div
-              className="reg-alert warn"
-              style={{ marginBottom: '1rem', background: 'var(--status-danger-bg)', borderColor: 'var(--status-danger-border)', color: 'var(--status-danger)' }}
-            >
+            <div className="reg-alert danger" style={{ marginBottom: '1rem' }}>
               <span>{formError || dbState.error}</span>
             </div>
           )}
@@ -166,21 +145,21 @@ export const FirebaseSetupModal: React.FC<FirebaseSetupModalProps> = ({
           <form id="firebase-config-form" onSubmit={handleConnect}>
             <div className="field-group">
               <label className="field-label" htmlFor="textarea-firebase-cfg">
-                Vložte objekt <code>firebaseConfig</code> z Firebase Console (Project Settings → Web App)
+                firebaseConfig
               </label>
               <textarea
                 id="textarea-firebase-cfg"
                 className="textarea-input"
-                style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', minHeight: 150 }}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', minHeight: 130 }}
                 value={rawSnippet}
                 onChange={(e) => setRawSnippet(e.target.value)}
-                placeholder={`const firebaseConfig = {\n  apiKey: "AIzaSy...",\n  authDomain: "vas-projekt.firebaseapp.com",\n  projectId: "vas-projekt",\n  appId: "1:123456789:web:abcdef"\n};`}
+                placeholder={`{\n  "apiKey": "...",\n  "authDomain": "...",\n  "projectId": "...",\n  "appId": "..."\n}`}
               />
             </div>
 
             <div className="field-group">
               <label className="field-label" htmlFor="input-firestore-db-id">
-                ID Firestore databáze (volitelné – ponechte prázdné pro výchozí <code>(default)</code>)
+                Database ID (volitelné)
               </label>
               <input
                 id="input-firestore-db-id"
@@ -192,32 +171,25 @@ export const FirebaseSetupModal: React.FC<FirebaseSetupModalProps> = ({
               />
             </div>
           </form>
-
-          <div style={{ marginTop: '1rem' }}>
-            <div className="field-label" style={{ marginBottom: '0.35rem' }}>
-              Rychlé nasazení pravidel a hostingu z tohoto repozitáře (CLI):
-            </div>
-            <pre className="code-snippet">
-{`npx -y firebase-tools@latest use <VASE_PROJECT_ID>
-npx -y firebase-tools@latest deploy --only auth,firestore:rules,firestore:indexes`}
-            </pre>
-          </div>
         </div>
 
         <div className="modal-footer">
           {dbState.mode === 'firebase' && (
-            <button
-              type="button"
-              className="btn btn-danger"
-              onClick={async () => {
-                await onDisconnect();
-                onShowToast('Odpojeno od Firebase – přepnuto na lokální úložiště.');
-                onClose();
-              }}
-            >
-              <Unplug size={15} />
-              Odpojit Firebase
-            </button>
+            <>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={async () => {
+                  await onDisconnect();
+                  onShowToast('Odpojeno od Firebase.');
+                  onClose();
+                }}
+              >
+                <Unplug size={15} />
+                Odpojit
+              </button>
+              <div className="spacer" />
+            </>
           )}
           <button type="button" className="btn btn-secondary" onClick={onClose}>
             Zavřít
@@ -225,10 +197,10 @@ npx -y firebase-tools@latest deploy --only auth,firestore:rules,firestore:indexe
           <button
             type="submit"
             form="firebase-config-form"
-            className="btn btn-primary"
+            className="btn btn-accent"
             disabled={busy || !rawSnippet.trim()}
           >
-            {busy ? 'Připojuji…' : 'Uložit a připojit Firestore'}
+            {busy ? 'Připojuji…' : 'Připojit'}
           </button>
         </div>
       </div>

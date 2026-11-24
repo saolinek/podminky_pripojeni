@@ -3,10 +3,9 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Copy,
   Edit3,
-  FilePlus2,
-  FolderCheck,
-  MessageSquarePlus,
+  MessageSquare,
   Printer,
   RotateCcw,
   Save,
@@ -14,7 +13,6 @@ import {
 } from 'lucide-react';
 import {
   type ChecklistItemTemplate,
-  EXPORT_MODES,
   matchesPlantConfig,
   PHASES,
   type PhaseId,
@@ -92,7 +90,6 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
 
   const categoryMeta = POWER_CATEGORIES.find((c) => c.id === config.category);
   const techMeta = PLANT_TECHNOLOGIES.find((t) => t.id === config.technology);
-  const exportMeta = EXPORT_MODES.find((e) => e.id === config.exportMode);
 
   const togglePhase = (phaseId: PhaseId) => {
     setCollapsedPhases((prev) => ({ ...prev, [phaseId]: !prev[phaseId] }));
@@ -109,43 +106,31 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
   };
 
   return (
-    <section aria-label="Odškrtávací seznam pro připojení zdroje">
-      {/* Summary Header Card */}
+    <section aria-label="Checklist připojení">
       <div className="summary-banner">
         <div className="summary-top">
           <div>
-            {activeProject && (
-              <div className="active-project-pill">
-                <FolderCheck size={14} />
-                <span>
-                  Uložený projekt: {activeProject.name}
-                  {activeProject.contractNumber ? ` • SoP č. ${activeProject.contractNumber}` : ''}
-                </span>
-              </div>
-            )}
             <h2 className="summary-heading">
               {activeProject
                 ? activeProject.name
-                : `Checklist připojení: ${techMeta?.label || config.technology} (${config.installedPowerKw} kW)`}
+                : `${techMeta?.label || config.technology} · ${config.installedPowerKw} kW`}
             </h2>
             <div className="spec-pills">
               <span className="spec-pill highlight">{categoryMeta?.label}</span>
-              <span className="spec-pill">Hladina {config.voltage}</span>
-              <span className="spec-pill">Pi = {config.installedPowerKw} kW</span>
+              <span className="spec-pill">{config.voltage}</span>
+              <span className="spec-pill">{config.installedPowerKw} kW</span>
               <span className="spec-pill">{categoryMeta?.rfgDoc}</span>
               <span className="spec-pill">
                 {config.exportMode === 'MIKROZDROJ_BEZ_PRETOKU'
-                  ? 'Bez přetoků (§ 16)'
+                  ? '§ 16 bez přetoků'
                   : config.exportMode === 'NULOVY_REZERVOVANY_VYKON'
                   ? 'Pr = 0 kW'
-                  : 'S přetoky do DS'}
+                  : 'S přetoky'}
               </span>
+              {activeProject?.contractNumber && (
+                <span className="spec-pill">SoP {activeProject.contractNumber}</span>
+              )}
             </div>
-            {exportMeta && (
-              <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: 'var(--ink-muted)' }}>
-                Režim: {exportMeta.label}
-              </p>
-            )}
           </div>
 
           <div className="summary-actions">
@@ -154,100 +139,100 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
                 <button
                   id="btn-quick-save-project"
                   type="button"
-                  className="btn btn-primary"
+                  className="btn btn-accent"
                   onClick={onQuickSaveActiveProject}
                 >
                   <Save size={15} />
-                  Uložit změny projektu
+                  Uložit
                 </button>
                 <button
                   id="btn-save-as-new-project"
                   type="button"
-                  className="btn btn-secondary"
+                  className="icon-btn bordered"
                   onClick={() => onOpenSaveProjectModal(true)}
+                  title="Uložit jako kopii"
+                  aria-label="Uložit jako kopii"
                 >
-                  <FilePlus2 size={15} />
-                  Uložit jako kopii
+                  <Copy size={15} />
                 </button>
               </>
             ) : (
               <button
                 id="btn-save-project-db"
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-accent"
                 onClick={() => onOpenSaveProjectModal(true)}
               >
                 <Save size={15} />
-                Uložit zakázku do databáze
+                Uložit projekt
               </button>
             )}
 
             <button
               id="btn-print-checklist"
               type="button"
-              className="btn btn-secondary"
+              className="icon-btn bordered"
               onClick={() => window.print()}
-              title="Vytisknout nebo uložit jako PDF protokol"
+              title="Tisk / PDF"
+              aria-label="Tisk / PDF"
             >
               <Printer size={15} />
-              Tisk / PDF
             </button>
 
             {completedCount > 0 && (
               <button
                 id="btn-clear-checks"
                 type="button"
-                className="btn btn-ghost"
+                className="icon-btn bordered"
                 onClick={onClearChecks}
-                title="Odškrtnout všechny položky"
+                title="Vynulovat zaškrtnutí"
+                aria-label="Vynulovat zaškrtnutí"
               >
                 <RotateCcw size={15} />
-                Vynulovat
               </button>
             )}
           </div>
         </div>
 
-        {/* Progress Bar */}
         <div className="progress-section">
-          <div className="progress-stats-row">
-            <span className="progress-label">
-              Postup splnění připojovacích podmínek ČEZ Distribuce
-            </span>
-            <span className="progress-fraction">
-              {completedCount} / {totalCount} bodů ({progressPct} %)
-            </span>
-          </div>
-          <div className="progress-track" role="progressbar" aria-valuenow={progressPct} aria-valuemin={0} aria-valuemax={100}>
+          <div
+            className="progress-track"
+            role="progressbar"
+            aria-valuenow={progressPct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
             <div
               className={`progress-fill ${progressPct === 100 && totalCount > 0 ? 'complete' : ''}`}
               style={{ width: `${progressPct}%` }}
             />
           </div>
+          <span className="progress-fraction">
+            {completedCount}/{totalCount} · {progressPct} %
+          </span>
         </div>
       </div>
 
-      {/* Filter & Search Toolbar */}
       <div className="checklist-toolbar">
         <div className="search-box">
-          <Search size={16} />
+          <Search size={15} />
           <input
             id="input-search-checklist"
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Hledat v bodech (např. HDO, UTP, revize, SIM, 412, OTE…)"
+            placeholder="Hledat…"
           />
         </div>
 
-        <div className="filter-pills" role="tablist" aria-label="Filtr stavu úkolů">
+        <div className="filter-pills" role="tablist" aria-label="Filtr">
           <button
             id="filter-btn-all"
             type="button"
             className={`filter-pill ${statusFilter === 'ALL' ? 'active' : ''}`}
             onClick={() => setStatusFilter('ALL')}
           >
-            Vše ({matchingItems.length})
+            Vše <span className="count">{matchingItems.length}</span>
           </button>
           <button
             id="filter-btn-todo"
@@ -255,7 +240,7 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
             className={`filter-pill ${statusFilter === 'TODO' ? 'active' : ''}`}
             onClick={() => setStatusFilter('TODO')}
           >
-            Zbývá ({matchingItems.length - completedCount})
+            Zbývá <span className="count">{matchingItems.length - completedCount}</span>
           </button>
           <button
             id="filter-btn-done"
@@ -263,17 +248,14 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
             className={`filter-pill ${statusFilter === 'DONE' ? 'active' : ''}`}
             onClick={() => setStatusFilter('DONE')}
           >
-            Splněno ({completedCount})
+            Hotovo <span className="count">{completedCount}</span>
           </button>
         </div>
       </div>
 
-      {/* Phases List */}
       {filteredItems.length === 0 ? (
         <div className="surface-card empty-state">
-          <p style={{ margin: 0, fontWeight: 600 }}>
-            Žádné položky neodpovídají aktuálnímu filtru nebo vyhledávání.
-          </p>
+          <p>Nic nenalezeno.</p>
         </div>
       ) : (
         <div className="phases-stack">
@@ -297,20 +279,15 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
                 >
                   <div className="phase-header-left">
                     <span className={`phase-step-num ${phaseAllDone ? 'done' : ''}`}>
-                      {phaseAllDone ? <Check size={15} strokeWidth={3} /> : phase.step}
+                      {phaseAllDone ? <Check size={13} strokeWidth={3} /> : phase.step}
                     </span>
-                    <div>
-                      <h3 className="phase-title">{phase.title}</h3>
-                      <div style={{ fontSize: '0.76rem', color: 'var(--ink-muted)' }}>
-                        {phase.subtitle}
-                      </div>
-                    </div>
+                    <h3 className="phase-title">{phase.title}</h3>
                   </div>
                   <div className="phase-header-right">
                     <span className={`phase-count-pill ${phaseAllDone ? 'done' : ''}`}>
                       {doneInPhase}/{allPhaseMatching.length}
                     </span>
-                    {isCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+                    {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                   </div>
                 </button>
 
@@ -335,7 +312,7 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
                             className={`custom-checkbox ${isChecked ? 'checked' : ''}`}
                             onClick={() => onToggleCheck(item.id)}
                           >
-                            {isChecked && <Check size={15} strokeWidth={3} />}
+                            {isChecked && <Check size={13} strokeWidth={3} />}
                           </button>
 
                           <div className="item-content">
@@ -347,39 +324,42 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
                                 {item.title}
                               </span>
 
-                              <button
-                                id={`edit-db-item-${item.id}`}
-                                type="button"
-                                className="item-note-btn no-print"
-                                onClick={() => onEditTemplateItem(item)}
-                                title="Upravit tuto podmínku ve sdílené databázi"
-                              >
-                                <Edit3 size={13} />
-                                Upravit v DB
-                              </button>
+                              <div className="item-actions no-print">
+                                <button
+                                  id={`note-btn-${item.id}`}
+                                  type="button"
+                                  className="icon-btn sm"
+                                  onClick={() => startEditingNote(item.id)}
+                                  title={savedNote ? 'Upravit poznámku' : 'Poznámka'}
+                                  aria-label={savedNote ? 'Upravit poznámku' : 'Přidat poznámku'}
+                                >
+                                  <MessageSquare size={14} />
+                                </button>
+                                <button
+                                  id={`edit-db-item-${item.id}`}
+                                  type="button"
+                                  className="icon-btn sm"
+                                  onClick={() => onEditTemplateItem(item)}
+                                  title="Upravit podmínku"
+                                  aria-label="Upravit podmínku"
+                                >
+                                  <Edit3 size={14} />
+                                </button>
+                              </div>
                             </div>
 
                             <p className="item-desc">{item.description}</p>
 
                             <div className="item-meta-row">
                               {item.reference && (
-                                <span className="meta-tag ref">{item.reference}</span>
+                                <span className="meta-tag">{item.reference}</span>
                               )}
                               {item.deadlineBadge && (
                                 <span className="meta-tag deadline">{item.deadlineBadge}</span>
                               )}
                               {!item.mandatory && (
-                                <span className="meta-tag optional">Doporučené / podmíněné</span>
+                                <span className="meta-tag optional">Volitelné</span>
                               )}
-                              <button
-                                id={`note-btn-${item.id}`}
-                                type="button"
-                                className="item-note-btn"
-                                onClick={() => startEditingNote(item.id)}
-                              >
-                                <MessageSquarePlus size={13} />
-                                {savedNote ? 'Upravit poznámku' : 'Přidat poznámku'}
-                              </button>
                             </div>
 
                             {isEditingThisNote ? (
@@ -389,7 +369,7 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
                                   type="text"
                                   value={noteDraft}
                                   onChange={(e) => setNoteDraft(e.target.value)}
-                                  placeholder="Např. č. revize 2026/48, podáno v DIP 12. 11., technik p. Dvořák…"
+                                  placeholder="Poznámka…"
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') commitNote(item.id);
                                     if (e.key === 'Escape') setEditingNoteId(null);
@@ -413,10 +393,12 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
                               </div>
                             ) : (
                               savedNote && (
-                                <div className="item-note-saved">
-                                  <span>
-                                    <strong>Poznámka:</strong> {savedNote}
-                                  </span>
+                                <div
+                                  className="item-note-saved"
+                                  onClick={() => startEditingNote(item.id)}
+                                  title="Kliknutím upravíte poznámku"
+                                >
+                                  {savedNote}
                                 </div>
                               )
                             )}

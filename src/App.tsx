@@ -291,18 +291,13 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <div className="cez-top-stripe" />
-
       <header className="app-header">
         <div className="header-inner">
           <div className="brand-group">
             <div className="brand-mark" aria-hidden="true">
-              <Zap size={22} fill="#ffffff" />
+              <Zap size={16} fill="#ffffff" />
             </div>
-            <div className="brand-titles">
-              <span className="brand-eyebrow">ČEZ Distribuce • PPDS Příloha č. 4 &amp; RfG</span>
-              <h1 className="brand-heading">Průvodce připojením nového zdroje</h1>
-            </div>
+            <h1 className="brand-heading">Připojení zdroje · ČEZ</h1>
           </div>
 
           <nav className="nav-tabs" aria-label="Hlavní navigace">
@@ -312,8 +307,8 @@ export function App() {
               className={`nav-tab ${activeTab === 'CHECKLIST' ? 'active' : ''}`}
               onClick={() => setActiveTab('CHECKLIST')}
             >
-              <CheckSquare size={16} />
-              Konfigurátor &amp; Checklist
+              <CheckSquare size={15} />
+              Checklist
             </button>
 
             <button
@@ -322,8 +317,8 @@ export function App() {
               className={`nav-tab ${activeTab === 'PROJECTS' ? 'active' : ''}`}
               onClick={() => setActiveTab('PROJECTS')}
             >
-              <FolderKanban size={16} />
-              Uložené projekty
+              <FolderKanban size={15} />
+              Projekty
               <span className="nav-badge">{projects.length}</span>
             </button>
 
@@ -333,32 +328,33 @@ export function App() {
               className={`nav-tab ${activeTab === 'DATABASE' ? 'active' : ''}`}
               onClick={() => setActiveTab('DATABASE')}
             >
-              <SlidersHorizontal size={16} />
-              Databáze podmínek
+              <SlidersHorizontal size={15} />
+              Podmínky
               <span className="nav-badge">{items.length}</span>
             </button>
           </nav>
 
-          <div className="header-actions">
-            <button
-              id="btn-open-firebase-modal"
-              type="button"
-              className="db-status-btn"
-              onClick={() => setShowFirebaseModal(true)}
-            >
-              <span
-                className={`status-dot ${
-                  dbState.mode === 'firebase' && dbState.connected ? 'connected' : 'local'
-                }`}
-              />
-              <Database size={14} />
-              <span>
-                {dbState.mode === 'firebase' && dbState.connected
-                  ? `Firebase: ${dbState.projectId}`
-                  : 'Připojit Firebase DB'}
-              </span>
-            </button>
-          </div>
+          <button
+            id="btn-open-firebase-modal"
+            type="button"
+            className="db-status-btn"
+            onClick={() => setShowFirebaseModal(true)}
+            title={
+              dbState.mode === 'firebase' && dbState.connected
+                ? `Firebase: ${dbState.projectId}`
+                : 'Lokální režim – kliknutím připojíte Firebase'
+            }
+          >
+            <span
+              className={`status-dot ${
+                dbState.mode === 'firebase' && dbState.connected ? 'connected' : 'local'
+              }`}
+            />
+            <Database size={14} />
+            <span>
+              {dbState.mode === 'firebase' && dbState.connected ? 'Cloud' : 'Lokální'}
+            </span>
+          </button>
         </div>
       </header>
 
@@ -419,22 +415,20 @@ export function App() {
       </main>
 
       <footer className="app-footer">
-        Zpracováno dle platných Připojovacích podmínek NN/VN/VVN společnosti ČEZ Distribuce, a. s.,
-        Pravidel provozování distribuční soustavy (PPDS Příloha č. 4 a č. 6), vyhlášky č. 16/2016 Sb.
-        a Nařízení Komise (EU) 2016/631 (RfG). Nástroj slouží jako praktická pomůcka a nenahrazuje
-        závazné podmínky konkrétní Smlouvy o připojení.
+        ČEZ Distribuce · PPDS Příloha č. 4 &amp; RfG · Orientační pomůcka
       </footer>
 
       {/* Save Project Modal */}
       {showSaveProjectModal && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <form className="modal-panel" style={{ maxWidth: 500 }} onSubmit={handleCreateProjectSubmit}>
+          <form className="modal-panel" style={{ maxWidth: 460 }} onSubmit={handleCreateProjectSubmit}>
             <div className="modal-header">
-              <h3>Uložit výrobnu / zakázku do sdílené databáze</h3>
+              <h3>Uložit projekt</h3>
               <button
                 type="button"
-                className="btn btn-ghost btn-sm"
+                className="icon-btn"
                 onClick={() => setShowSaveProjectModal(false)}
+                aria-label="Zavřít"
               >
                 <X size={18} />
               </button>
@@ -443,7 +437,7 @@ export function App() {
             <div className="modal-body">
               <div className="field-group">
                 <label className="field-label" htmlFor="input-proj-name">
-                  Označení projektu / výrobny * (neuvádějte citlivé osobní údaje)
+                  Název projektu *
                 </label>
                 <input
                   id="input-proj-name"
@@ -453,7 +447,7 @@ export function App() {
                   className="text-input"
                   value={projectNameInput}
                   onChange={(e) => setProjectNameInput(e.target.value)}
-                  placeholder="Např. FVE Hala Plzeň-Bory 99 kWp"
+                  placeholder="FVE Hala Plzeň 99 kWp"
                   autoFocus
                 />
               </div>
@@ -461,7 +455,7 @@ export function App() {
               <div className="form-row-2 field-group">
                 <div>
                   <label className="field-label" htmlFor="input-proj-contract">
-                    Číslo žádosti / SoP (volitelné)
+                    Číslo SoP / žádosti
                   </label>
                   <input
                     id="input-proj-contract"
@@ -475,7 +469,7 @@ export function App() {
                 </div>
                 <div>
                   <label className="field-label" htmlFor="input-proj-ean">
-                    EAN místa (volitelné)
+                    EAN
                   </label>
                   <input
                     id="input-proj-ean"
@@ -498,8 +492,8 @@ export function App() {
               >
                 Zrušit
               </button>
-              <button type="submit" className="btn btn-primary">
-                Uložit projekt
+              <button type="submit" className="btn btn-accent">
+                Uložit
               </button>
             </div>
           </form>

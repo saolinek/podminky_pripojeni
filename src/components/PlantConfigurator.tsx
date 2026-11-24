@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Info, RotateCcw, Zap } from 'lucide-react';
+import { AlertTriangle, Info, RotateCcw } from 'lucide-react';
 import {
   EXPORT_MODES,
   type ExportMode,
@@ -119,55 +119,42 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
   return (
     <aside className="surface-card config-sticky" aria-label="Konfigurátor výrobny">
       <div className="card-header">
-        <div className="card-title-group">
-          <h2>Parametry připojovaného zdroje</h2>
-          <p>Zadejte výrobnu – seznam se ihned přizpůsobí dle PPDS ČEZ Distribuce</p>
-        </div>
+        <h2 className="card-title">Parametry zdroje</h2>
         <button
           id="btn-reset-configurator"
           type="button"
-          className="btn btn-ghost btn-sm"
+          className="icon-btn"
           onClick={onResetConfig}
-          title="Obnovit výchozí parametry zdroje"
+          title="Obnovit výchozí"
+          aria-label="Obnovit výchozí"
         >
-          <RotateCcw size={14} />
-          Reset
+          <RotateCcw size={15} />
         </button>
       </div>
 
       <div className="card-body">
-        {/* 1. Druh technologie */}
         <div className="field-group">
-          <div className="field-label-row">
-            <span className="field-label">1. Technologie zdroje / akumulace</span>
-          </div>
+          <span className="field-label">Technologie</span>
           <div className="choice-grid-2">
-            {PLANT_TECHNOLOGIES.map((tech) => {
-              const selected = config.technology === tech.id;
-              return (
-                <button
-                  key={tech.id}
-                  id={`tech-btn-${tech.id}`}
-                  type="button"
-                  className={`choice-btn ${selected ? 'selected' : ''}`}
-                  onClick={() => handleTechChange(tech.id)}
-                >
-                  <span className="choice-btn-title">{tech.label}</span>
-                  <span className="choice-btn-sub">{tech.sub}</span>
-                </button>
-              );
-            })}
+            {PLANT_TECHNOLOGIES.map((tech) => (
+              <button
+                key={tech.id}
+                id={`tech-btn-${tech.id}`}
+                type="button"
+                className={`choice-btn ${config.technology === tech.id ? 'selected' : ''}`}
+                onClick={() => handleTechChange(tech.id)}
+                title={tech.sub}
+              >
+                {tech.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* 2. Instalovaný výkon Pi */}
         <div className="field-group">
-          <div className="field-label-row">
-            <label htmlFor="input-installed-power" className="field-label">
-              2. Celkový instalovaný výkon Pi
-            </label>
-            <span className="field-hint">Automaticky určí kategorii RfG</span>
-          </div>
+          <label htmlFor="input-installed-power" className="field-label">
+            Instalovaný výkon (Pi)
+          </label>
           <div className="power-input-wrap">
             <input
               id="input-installed-power"
@@ -178,7 +165,7 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
               className="power-input"
               value={config.installedPowerKw || ''}
               onChange={(e) => handlePowerChange(e.target.value)}
-              placeholder="např. 9.9"
+              placeholder="9.9"
             />
             <span className="power-unit">kW</span>
           </div>
@@ -199,40 +186,28 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
           </div>
         </div>
 
-        {/* 3. Napěťová hladina */}
         <div className="field-group">
-          <div className="field-label-row">
-            <span className="field-label">3. Napěťová hladina připojení</span>
-          </div>
+          <span className="field-label">Napěťová hladina</span>
           <div className="choice-grid-3">
-            {VOLTAGE_LEVELS.map((v) => {
-              const selected = config.voltage === v.id;
-              return (
-                <button
-                  key={v.id}
-                  id={`voltage-btn-${v.id}`}
-                  type="button"
-                  className={`choice-btn ${selected ? 'selected' : ''}`}
-                  onClick={() => handleVoltageChange(v.id)}
-                >
-                  <span className="choice-btn-title">
-                    <Zap size={13} />
-                    {v.label}
-                  </span>
-                  <span className="choice-btn-sub">{v.sub}</span>
-                </button>
-              );
-            })}
+            {VOLTAGE_LEVELS.map((v) => (
+              <button
+                key={v.id}
+                id={`voltage-btn-${v.id}`}
+                type="button"
+                className={`choice-btn ${config.voltage === v.id ? 'selected' : ''}`}
+                onClick={() => handleVoltageChange(v.id)}
+                title={v.sub}
+              >
+                {v.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* 4. Kategorie výrobního modulu (PPDS P4 / RfG) */}
         <div className="field-group">
-          <div className="field-label-row">
-            <label htmlFor="select-rfg-category" className="field-label">
-              4. Kategorie výrobního modulu (PPDS Příloha č. 4)
-            </label>
-          </div>
+          <label htmlFor="select-rfg-category" className="field-label">
+            Kategorie RfG
+          </label>
           <select
             id="select-rfg-category"
             className="select-input"
@@ -241,19 +216,16 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
           >
             {POWER_CATEGORIES.map((cat) => (
               <option key={cat.id} value={cat.id}>
-                {cat.label} — {cat.rangeLabel}
+                {cat.label} · {cat.rangeLabel}
               </option>
             ))}
           </select>
         </div>
 
-        {/* 5. Režim přetoků */}
         <div className="field-group">
-          <div className="field-label-row">
-            <label htmlFor="select-export-mode" className="field-label">
-              5. Režim dodávky (přetoků) do sítě ČEZ Distribuce
-            </label>
-          </div>
+          <label htmlFor="select-export-mode" className="field-label">
+            Přetoky do sítě
+          </label>
           <select
             id="select-export-mode"
             className="select-input"
@@ -264,7 +236,10 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
               <option
                 key={m.id}
                 value={m.id}
-                disabled={m.id === 'MIKROZDROJ_BEZ_PRETOKU' && (config.installedPowerKw > 10.8 || config.voltage !== 'NN')}
+                disabled={
+                  m.id === 'MIKROZDROJ_BEZ_PRETOKU' &&
+                  (config.installedPowerKw > 10.8 || config.voltage !== 'NN')
+                }
               >
                 {m.label}
               </option>
@@ -272,11 +247,8 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
           </select>
         </div>
 
-        {/* 6. Specifické okolnosti */}
         <div className="field-group">
-          <div className="field-label-row">
-            <span className="field-label">6. Doplňující podmínky místa připojení</span>
-          </div>
+          <span className="field-label">Další podmínky</span>
           <div className="flags-list">
             {SPECIAL_FLAGS.map((flag) => {
               const checked = config.flags.includes(flag.id);
@@ -300,50 +272,32 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
           </div>
         </div>
 
-        {/* Dynamická upozornění dle pravidel ČEZ Distribuce */}
         <div className="reg-alerts">
           {config.installedPowerKw <= 3.7 && config.voltage === 'NN' && (
             <div className="reg-alert info">
-              <Info size={16} />
-              <span>
-                <strong>Jednofázové připojení povoleno:</strong> Do výkonu střídače 3,7 kVA / fázi lze zdroj na NN připojit i jednofázově (kap. 4.1.7 PP NN).
-              </span>
+              <Info size={15} />
+              <span>Do 3,7 kVA lze připojit jednofázově.</span>
             </div>
           )}
 
           {config.exportMode === 'MIKROZDROJ_BEZ_PRETOKU' && (
             <div className="reg-alert warn">
-              <AlertTriangle size={16} />
-              <span>
-                <strong>Zjednodušený mikrozdroj (§ 16):</strong> Nulový rezervovaný výkon (Pr = 0 kW). Jakákoliv nechtěná dodávka přetoků do DS je penalizována dle Cenového rozhodnutí ERÚ.
-              </span>
+              <AlertTriangle size={15} />
+              <span>Pr = 0 kW — přetoky do DS jsou penalizovány.</span>
             </div>
           )}
 
           {config.installedPowerKw > 50 && config.installedPowerKw < 100 && (
             <div className="reg-alert warn">
-              <AlertTriangle size={16} />
-              <span>
-                <strong>Výkon nad 50 kW (Kategorie A2):</strong> Vyžaduje licenci ERÚ na výrobu elektřiny a stavební povolení, ale řízení výkonu na NN stále řeší přijímač HDO (bez ŘJ se SIM).
-              </span>
+              <AlertTriangle size={15} />
+              <span>Nad 50 kW nutná licence ERÚ; řízení na NN přes HDO.</span>
             </div>
           )}
 
           {(config.installedPowerKw >= 100 || ['B1', 'B2', 'C_D'].includes(config.category)) && (
             <div className="reg-alert warn">
-              <AlertTriangle size={16} />
-              <span>
-                <strong>Povinné dispečerské řízení a UPOS (od 100 kW):</strong> Nutná vlastní Řídicí jednotka se SIM kartou ČEZ Distribuce (optikou na VVN), schválení PD + Tabulky telemetrie, MPP, zkoušky bod–bod a ověření souladu RfG v režimu UPOS.
-              </span>
-            </div>
-          )}
-
-          {(config.technology === 'FVE_BESS' || config.technology === 'BESS') && (
-            <div className="reg-alert info">
-              <Info size={16} />
-              <span>
-                <strong>Pravidlo pro akumulaci (BESS):</strong> Mají-li FVE a baterie společný hybridní střídač, počítá se za Pi vyšší z hodnot panelů nebo střídače; u samostatných střídačů se výkony sčítají.
-              </span>
+              <AlertTriangle size={15} />
+              <span>Od 100 kW povinná ŘJ se SIM, telemetrie, MPP a UPOS.</span>
             </div>
           )}
         </div>
