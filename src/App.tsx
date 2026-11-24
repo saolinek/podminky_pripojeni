@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   CheckSquare,
   Database,
-  FolderKanban,
   SlidersHorizontal,
   X,
   Zap,
@@ -22,7 +21,6 @@ import {
   loadLocalItems,
   loadLocalProjects,
   removeChecklistItem,
-  removeSavedProject,
   seedDefaultsToFirestore,
   syncLocalItemsAndProjectsToCloud,
   upsertChecklistItem,
@@ -30,11 +28,10 @@ import {
 } from './services/firebaseService';
 import { PlantConfigurator } from './components/PlantConfigurator';
 import { ChecklistView } from './components/ChecklistView';
-import { SavedProjectsView } from './components/SavedProjectsView';
 import { TemplateDatabaseView } from './components/TemplateDatabaseView';
 import { FirebaseSetupModal } from './components/FirebaseSetupModal';
 
-type ActiveTab = 'CHECKLIST' | 'PROJECTS' | 'DATABASE';
+type ActiveTab = 'CHECKLIST' | 'DATABASE';
 
 const DEFAULT_CONFIG: PlantConfig = {
   installedPowerKw: 9.9,
@@ -234,33 +231,6 @@ export function App() {
     showToast(`Projekt „${activeProject.name}“ aktualizován v databázi.`);
   };
 
-  const handleSelectProject = (proj: SavedProject) => {
-    setActiveProjectId(proj.id);
-    setConfig({
-      installedPowerKw: proj.installedPowerKw,
-      category: proj.category,
-      voltage: proj.voltage,
-      technology: proj.technology,
-      exportMode: proj.exportMode,
-      flags: proj.flags,
-    });
-    setCheckedIds(proj.checkedIds);
-    setItemNotes(proj.itemNotes);
-    setActiveTab('CHECKLIST');
-    showToast(`Načten projekt „${proj.name}“.`);
-  };
-
-  const handleDeleteProject = async (projectId: string) => {
-    await removeSavedProject(projectId);
-    if (dbState.mode === 'local') {
-      setProjects(loadLocalProjects());
-    }
-    if (activeProjectId === projectId) {
-      setActiveProjectId(null);
-    }
-    showToast('Projekt byl odstraněn z databáze.');
-  };
-
   const handleSaveTemplateItem = async (item: ChecklistItemTemplate, isNew: boolean) => {
     await upsertChecklistItem(item, isNew);
     if (dbState.mode === 'local') {
@@ -309,17 +279,6 @@ export function App() {
             >
               <CheckSquare size={15} />
               Checklist
-            </button>
-
-            <button
-              id="nav-tab-projects"
-              type="button"
-              className={`nav-tab ${activeTab === 'PROJECTS' ? 'active' : ''}`}
-              onClick={() => setActiveTab('PROJECTS')}
-            >
-              <FolderKanban size={15} />
-              Projekty
-              <span className="nav-badge">{projects.length}</span>
             </button>
 
             <button
@@ -389,17 +348,6 @@ export function App() {
               }}
             />
           </div>
-        )}
-
-        {activeTab === 'PROJECTS' && (
-          <SavedProjectsView
-            projects={projects}
-            allItems={items}
-            activeProjectId={activeProjectId}
-            onSelectProject={handleSelectProject}
-            onDeleteProject={handleDeleteProject}
-            onCreateNewFromCurrent={openNewProjectModal}
-          />
         )}
 
         {activeTab === 'DATABASE' && (

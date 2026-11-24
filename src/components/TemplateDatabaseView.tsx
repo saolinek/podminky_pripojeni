@@ -5,7 +5,6 @@ import {
   EXPORT_MODES,
   type ExportMode,
   PHASES,
-  type PhaseId,
   PLANT_TECHNOLOGIES,
   type PlantTechnology,
   POWER_CATEGORIES,
@@ -87,16 +86,13 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!modalItem || !modalItem.title.trim() || !modalItem.description.trim()) return;
+    if (!modalItem || !modalItem.title.trim()) return;
     setSaving(true);
     try {
       await onSaveItem(
         {
           ...modalItem,
           title: modalItem.title.trim(),
-          description: modalItem.description.trim(),
-          reference: modalItem.reference.trim(),
-          deadlineBadge: modalItem.deadlineBadge.trim(),
         },
         isNewModal
       );
@@ -199,65 +195,41 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
           </div>
         ) : (
           <div className="db-items-list">
-            {filteredItems.map((item) => {
-              const phaseMeta = PHASES.find((p) => p.id === item.phase);
-              return (
-                <div key={item.id} className="db-item-row">
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h3>{item.title}</h3>
-                    <p>{item.description}</p>
-                    <div className="item-meta-row">
-                      <span className="meta-tag deadline">
-                        {phaseMeta?.step}. {phaseMeta?.title}
-                      </span>
-                      {item.reference && <span className="meta-tag">{item.reference}</span>}
-                      {item.categories.length > 0 && (
-                        <span className="meta-tag">{item.categories.join(', ')}</span>
-                      )}
-                      {item.voltages.length > 0 && (
-                        <span className="meta-tag">{item.voltages.join(', ')}</span>
-                      )}
-                      {item.technologies.length > 0 && (
-                        <span className="meta-tag">{item.technologies.join(', ')}</span>
-                      )}
-                      {item.requiredFlags.length > 0 && (
-                        <span className="meta-tag">{item.requiredFlags.join(', ')}</span>
-                      )}
-                    </div>
-                  </div>
+            {filteredItems.map((item) => (
+              <div key={item.id} className="db-item-row" style={{ alignItems: 'center' }}>
+                <h3 style={{ flex: 1, minWidth: 0 }}>{item.title}</h3>
 
-                  <div className="row-actions">
-                    <button
-                      id={`btn-edit-template-${item.id}`}
-                      type="button"
-                      className="icon-btn sm"
-                      onClick={() => {
-                        setModalItem({ ...item });
-                        setIsNewModal(false);
-                      }}
-                      title="Upravit"
-                      aria-label="Upravit"
-                    >
-                      <Edit3 size={14} />
-                    </button>
-                    <button
-                      id={`btn-del-template-${item.id}`}
-                      type="button"
-                      className="icon-btn sm danger"
-                      onClick={() => {
-                        if (window.confirm(`Smazat „${item.title}“?`)) {
-                          onDeleteItem(item.id);
-                        }
-                      }}
-                      title="Smazat"
-                      aria-label="Smazat"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+                <div className="row-actions">
+                  <button
+                    id={`btn-edit-template-${item.id}`}
+                    type="button"
+                    className="icon-btn sm"
+                    onClick={() => {
+                      setModalItem({ ...item });
+                      setIsNewModal(false);
+                    }}
+                    title="Upravit"
+                    aria-label="Upravit"
+                  >
+                    <Edit3 size={14} />
+                  </button>
+                  <button
+                    id={`btn-del-template-${item.id}`}
+                    type="button"
+                    className="icon-btn sm danger"
+                    onClick={() => {
+                      if (window.confirm(`Smazat „${item.title}“?`)) {
+                        onDeleteItem(item.id);
+                      }
+                    }}
+                    title="Smazat"
+                    aria-label="Smazat"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -290,93 +262,9 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
                   className="text-input"
                   value={modalItem.title}
                   onChange={(e) => setModalItem({ ...modalItem, title: e.target.value })}
-                  placeholder="Kontrola nastavení ochran dle VP_05"
+                  placeholder="Název podmínky"
+                  autoFocus
                 />
-              </div>
-
-              <div className="field-group">
-                <label className="field-label" htmlFor="edit-item-desc">
-                  Popis *
-                </label>
-                <textarea
-                  id="edit-item-desc"
-                  required
-                  maxLength={1500}
-                  className="textarea-input"
-                  value={modalItem.description}
-                  onChange={(e) => setModalItem({ ...modalItem, description: e.target.value })}
-                  placeholder="Postup, přílohy nebo lhůty…"
-                />
-              </div>
-
-              <div className="form-row-2 field-group">
-                <div>
-                  <label className="field-label" htmlFor="edit-item-phase">
-                    Fáze
-                  </label>
-                  <select
-                    id="edit-item-phase"
-                    className="select-input"
-                    value={modalItem.phase}
-                    onChange={(e) =>
-                      setModalItem({ ...modalItem, phase: e.target.value as PhaseId })
-                    }
-                  >
-                    {PHASES.map((ph) => (
-                      <option key={ph.id} value={ph.id}>
-                        {ph.step}. {ph.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="field-label" htmlFor="edit-item-order">
-                    Pořadí
-                  </label>
-                  <input
-                    id="edit-item-order"
-                    type="number"
-                    min={0}
-                    max={10000}
-                    className="text-input"
-                    value={modalItem.order}
-                    onChange={(e) =>
-                      setModalItem({ ...modalItem, order: Number(e.target.value) || 0 })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="form-row-2 field-group">
-                <div>
-                  <label className="field-label" htmlFor="edit-item-ref">
-                    Předpis / norma
-                  </label>
-                  <input
-                    id="edit-item-ref"
-                    type="text"
-                    maxLength={150}
-                    className="text-input"
-                    value={modalItem.reference}
-                    onChange={(e) => setModalItem({ ...modalItem, reference: e.target.value })}
-                    placeholder="PPDS Příloha č. 4"
-                  />
-                </div>
-                <div>
-                  <label className="field-label" htmlFor="edit-item-badge">
-                    Lhůta / štítek
-                  </label>
-                  <input
-                    id="edit-item-badge"
-                    type="text"
-                    maxLength={60}
-                    className="text-input"
-                    value={modalItem.deadlineBadge}
-                    onChange={(e) => setModalItem({ ...modalItem, deadlineBadge: e.target.value })}
-                    placeholder="Lhůta 30 dnů"
-                  />
-                </div>
               </div>
 
               <div className="field-group">
@@ -519,15 +407,6 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
                   })}
                 </div>
               </div>
-
-              <label className="flag-toggle">
-                <input
-                  type="checkbox"
-                  checked={modalItem.mandatory}
-                  onChange={(e) => setModalItem({ ...modalItem, mandatory: e.target.checked })}
-                />
-                <span>Povinný požadavek</span>
-              </label>
             </div>
 
             <div className="modal-footer">
