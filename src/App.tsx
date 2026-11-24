@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   CheckSquare,
-  Database,
   SlidersHorizontal,
   Zap,
 } from 'lucide-react';
@@ -12,19 +11,16 @@ import {
 import {
   connectAndSubscribeFirebase,
   type DbConnectionState,
-  disconnectFirebase,
   type FirebaseClientConfig,
   getSavedFirebaseConfig,
   loadLocalItems,
   removeChecklistItem,
   seedDefaultsToFirestore,
-  syncLocalItemsAndProjectsToCloud,
   upsertChecklistItem,
 } from './services/firebaseService';
 import { PlantConfigurator } from './components/PlantConfigurator';
 import { ChecklistView } from './components/ChecklistView';
 import { TemplateDatabaseView } from './components/TemplateDatabaseView';
-import { FirebaseSetupModal } from './components/FirebaseSetupModal';
 
 type ActiveTab = 'CHECKLIST' | 'DATABASE';
 
@@ -53,8 +49,6 @@ export function App() {
     authEmail: '',
     error: '',
   });
-
-  const [showFirebaseModal, setShowFirebaseModal] = useState(false);
 
   const [editingTemplateFromChecklist, setEditingTemplateFromChecklist] =
     useState<ChecklistItemTemplate | null>(null);
@@ -185,28 +179,6 @@ export function App() {
               <span className="nav-badge">{items.length}</span>
             </button>
           </nav>
-
-          <button
-            id="btn-open-firebase-modal"
-            type="button"
-            className="db-status-btn"
-            onClick={() => setShowFirebaseModal(true)}
-            title={
-              dbState.mode === 'firebase' && dbState.connected
-                ? `Firebase: ${dbState.projectId}`
-                : 'Lokální režim – kliknutím připojíte Firebase'
-            }
-          >
-            <span
-              className={`status-dot ${
-                dbState.mode === 'firebase' && dbState.connected ? 'connected' : 'local'
-              }`}
-            />
-            <Database size={14} />
-            <span>
-              {dbState.mode === 'firebase' && dbState.connected ? 'Cloud' : 'Lokální'}
-            </span>
-          </button>
         </div>
       </header>
 
@@ -249,32 +221,6 @@ export function App() {
       <footer className="app-footer">
         ČEZ Distribuce · PPDS Příloha č. 4 &amp; RfG · Orientační pomůcka
       </footer>
-
-      {/* Firebase Cloud Setup Modal */}
-      {showFirebaseModal && (
-        <FirebaseSetupModal
-          dbState={dbState}
-          onClose={() => setShowFirebaseModal(false)}
-          onConnectConfig={async (cfg) => {
-            await establishFirebase(cfg);
-          }}
-          onDisconnect={async () => {
-            await disconnectFirebase();
-            setDbState({
-              mode: 'local',
-              connected: false,
-              projectId: '',
-              uid: '',
-              authEmail: '',
-              error: '',
-            });
-          }}
-          onSyncLocalToCloud={async () => {
-            await syncLocalItemsAndProjectsToCloud(items, []);
-          }}
-          onShowToast={showToast}
-        />
-      )}
 
       {toastMsg && (
         <div className="toast-banner" role="status" aria-live="polite">
