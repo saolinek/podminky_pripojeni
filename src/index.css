@@ -645,8 +645,16 @@ h3 {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  padding: 1.25rem;
+  padding: 0.85rem 1.1rem;
   margin-bottom: 1rem;
+}
+
+.summary-banner.sticky-progress {
+  position: sticky;
+  top: 4.1rem;
+  z-index: 30;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(180%) blur(10px);
 }
 
 .summary-top {
@@ -695,7 +703,6 @@ h3 {
   display: flex;
   align-items: center;
   gap: 0.85rem;
-  margin-top: 1.1rem;
 }
 
 .progress-fraction {

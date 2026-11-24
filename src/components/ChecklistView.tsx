@@ -3,12 +3,8 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  Copy,
   Edit3,
   MessageSquare,
-  Printer,
-  RotateCcw,
-  Save,
   Search,
 } from 'lucide-react';
 import {
@@ -16,10 +12,7 @@ import {
   matchesPlantConfig,
   PHASES,
   type PhaseId,
-  PLANT_TECHNOLOGIES,
   type PlantConfig,
-  POWER_CATEGORIES,
-  type SavedProject,
 } from '../types';
 
 interface ChecklistViewProps {
@@ -27,12 +20,8 @@ interface ChecklistViewProps {
   allItems: ChecklistItemTemplate[];
   checkedIds: string[];
   itemNotes: Record<string, string>;
-  activeProject: SavedProject | null;
   onToggleCheck: (itemId: string) => void;
   onSaveItemNote: (itemId: string, note: string) => void;
-  onClearChecks: () => void;
-  onOpenSaveProjectModal: (saveAsNew: boolean) => void;
-  onQuickSaveActiveProject: () => void;
   onEditTemplateItem: (item: ChecklistItemTemplate) => void;
 }
 
@@ -43,12 +32,8 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
   allItems,
   checkedIds,
   itemNotes,
-  activeProject,
   onToggleCheck,
   onSaveItemNote,
-  onClearChecks,
-  onOpenSaveProjectModal,
-  onQuickSaveActiveProject,
   onEditTemplateItem,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -88,9 +73,6 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
     });
   }, [matchingItems, checkedSet, statusFilter, searchQuery, itemNotes]);
 
-  const categoryMeta = POWER_CATEGORIES.find((c) => c.id === config.category);
-  const techMeta = PLANT_TECHNOLOGIES.find((t) => t.id === config.technology);
-
   const togglePhase = (phaseId: PhaseId) => {
     setCollapsedPhases((prev) => ({ ...prev, [phaseId]: !prev[phaseId] }));
   };
@@ -107,93 +89,7 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
 
   return (
     <section aria-label="Checklist připojení">
-      <div className="summary-banner">
-        <div className="summary-top">
-          <div>
-            <h2 className="summary-heading">
-              {activeProject
-                ? activeProject.name
-                : `${techMeta?.label || config.technology} · ${config.installedPowerKw} kW`}
-            </h2>
-            <div className="spec-pills">
-              <span className="spec-pill highlight">{categoryMeta?.label}</span>
-              <span className="spec-pill">{config.voltage}</span>
-              <span className="spec-pill">{config.installedPowerKw} kW</span>
-              <span className="spec-pill">{categoryMeta?.rfgDoc}</span>
-              <span className="spec-pill">
-                {config.exportMode === 'MIKROZDROJ_BEZ_PRETOKU'
-                  ? '§ 16 bez přetoků'
-                  : config.exportMode === 'NULOVY_REZERVOVANY_VYKON'
-                  ? 'Pr = 0 kW'
-                  : 'S přetoky'}
-              </span>
-              {activeProject?.contractNumber && (
-                <span className="spec-pill">SoP {activeProject.contractNumber}</span>
-              )}
-            </div>
-          </div>
-
-          <div className="summary-actions">
-            {activeProject ? (
-              <>
-                <button
-                  id="btn-quick-save-project"
-                  type="button"
-                  className="btn btn-accent"
-                  onClick={onQuickSaveActiveProject}
-                >
-                  <Save size={15} />
-                  Uložit
-                </button>
-                <button
-                  id="btn-save-as-new-project"
-                  type="button"
-                  className="icon-btn bordered"
-                  onClick={() => onOpenSaveProjectModal(true)}
-                  title="Uložit jako kopii"
-                  aria-label="Uložit jako kopii"
-                >
-                  <Copy size={15} />
-                </button>
-              </>
-            ) : (
-              <button
-                id="btn-save-project-db"
-                type="button"
-                className="btn btn-accent"
-                onClick={() => onOpenSaveProjectModal(true)}
-              >
-                <Save size={15} />
-                Uložit projekt
-              </button>
-            )}
-
-            <button
-              id="btn-print-checklist"
-              type="button"
-              className="icon-btn bordered"
-              onClick={() => window.print()}
-              title="Tisk / PDF"
-              aria-label="Tisk / PDF"
-            >
-              <Printer size={15} />
-            </button>
-
-            {completedCount > 0 && (
-              <button
-                id="btn-clear-checks"
-                type="button"
-                className="icon-btn bordered"
-                onClick={onClearChecks}
-                title="Vynulovat zaškrtnutí"
-                aria-label="Vynulovat zaškrtnutí"
-              >
-                <RotateCcw size={15} />
-              </button>
-            )}
-          </div>
-        </div>
-
+      <div className="summary-banner sticky-progress">
         <div className="progress-section">
           <div
             className="progress-track"
@@ -346,20 +242,6 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
                                   <Edit3 size={14} />
                                 </button>
                               </div>
-                            </div>
-
-                            <p className="item-desc">{item.description}</p>
-
-                            <div className="item-meta-row">
-                              {item.reference && (
-                                <span className="meta-tag">{item.reference}</span>
-                              )}
-                              {item.deadlineBadge && (
-                                <span className="meta-tag deadline">{item.deadlineBadge}</span>
-                              )}
-                              {!item.mandatory && (
-                                <span className="meta-tag optional">Volitelné</span>
-                              )}
                             </div>
 
                             {isEditingThisNote ? (

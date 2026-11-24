@@ -1,16 +1,13 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   CheckSquare,
   Database,
   SlidersHorizontal,
-  X,
   Zap,
 } from 'lucide-react';
 import {
   type ChecklistItemTemplate,
-  PLANT_TECHNOLOGIES,
   type PlantConfig,
-  type SavedProject,
 } from './types';
 import {
   connectAndSubscribeFirebase,
@@ -19,12 +16,10 @@ import {
   type FirebaseClientConfig,
   getSavedFirebaseConfig,
   loadLocalItems,
-  loadLocalProjects,
   removeChecklistItem,
   seedDefaultsToFirestore,
   syncLocalItemsAndProjectsToCloud,
   upsertChecklistItem,
-  upsertSavedProject,
 } from './services/firebaseService';
 import { PlantConfigurator } from './components/PlantConfigurator';
 import { ChecklistView } from './components/ChecklistView';
@@ -46,9 +41,7 @@ export function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('CHECKLIST');
   const [config, setConfig] = useState<PlantConfig>(DEFAULT_CONFIG);
   const [items, setItems] = useState<ChecklistItemTemplate[]>(() => loadLocalItems());
-  const [projects, setProjects] = useState<SavedProject[]>(() => loadLocalProjects());
 
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [itemNotes, setItemNotes] = useState<Record<string, string>>({});
 
@@ -62,10 +55,6 @@ export function App() {
   });
 
   const [showFirebaseModal, setShowFirebaseModal] = useState(false);
-  const [showSaveProjectModal, setShowSaveProjectModal] = useState(false);
-  const [projectNameInput, setProjectNameInput] = useState('');
-  const [contractNumInput, setContractNumInput] = useState('');
-  const [eanInput, setEanInput] = useState('');
 
   const [editingTemplateFromChecklist, setEditingTemplateFromChecklist] =
     useState<ChecklistItemTemplate | null>(null);
@@ -86,7 +75,7 @@ export function App() {
     await connectAndSubscribeFirebase(cfg, {
       onStateChange: (st) => setDbState(st),
       onItemsUpdate: (cloudItems) => setItems(cloudItems),
-      onProjectsUpdate: (cloudProjects) => setProjects(cloudProjects),
+      onProjectsUpdate: () => {},
     });
   }, []);
 
@@ -106,53 +95,11 @@ export function App() {
     }
   }, [establishFirebase]);
 
-  const activeProject = projects.find((p) => p.id === activeProjectId) || null;
-
-  // Keep local active project state synced if updated remotely via Firestore snapshot
-  useEffect(() => {
-    if (!activeProjectId) return;
-    const remote = projects.find((p) => p.id === activeProjectId);
-    if (remote) {
-      setCheckedIds(remote.checkedIds);
-      setItemNotes(remote.itemNotes);
-    }
-  }, [projects, activeProjectId]);
-
-  const persistActiveProjectProgress = useCallback(
-    async (
-      nextConfig: PlantConfig,
-      nextChecked: string[],
-      nextNotes: Record<string, string>
-    ) => {
-      if (!activeProject) return;
-      const updated: SavedProject = {
-        ...activeProject,
-        installedPowerKw: nextConfig.installedPowerKw,
-        category: nextConfig.category,
-        voltage: nextConfig.voltage,
-        technology: nextConfig.technology,
-        exportMode: nextConfig.exportMode,
-        flags: nextConfig.flags,
-        checkedIds: nextChecked,
-        itemNotes: nextNotes,
-      };
-      const saved = await upsertSavedProject(updated, false);
-      if (dbState.mode === 'local') {
-        setProjects(loadLocalProjects());
-      }
-      return saved;
-    },
-    [activeProject, dbState.mode]
-  );
-
   const handleToggleCheck = (itemId: string) => {
     const next = checkedIds.includes(itemId)
       ? checkedIds.filter((x) => x !== itemId)
       : [...checkedIds, itemId];
     setCheckedIds(next);
-    if (activeProject) {
-      persistActiveProjectProgress(config, next, itemNotes).catch(() => {});
-    }
   };
 
   const handleSaveItemNote = (itemId: string, note: string) => {
@@ -163,9 +110,6 @@ export function App() {
       delete nextNotes[itemId];
     }
     setItemNotes(nextNotes);
-    if (activeProject) {
-      persistActiveProjectProgress(config, checkedIds, nextNotes).catch(() => {});
-    }
     showToast('Poznámka u položky uložena.');
   };
 
@@ -174,61 +118,10 @@ export function App() {
   };
 
   const handleResetConfigurator = () => {
-    setActiveProjectId(null);
     setConfig(DEFAULT_CONFIG);
     setCheckedIds([]);
     setItemNotes({});
     showToast('Konfigurátor obnoven na výchozí hodnoty.');
-  };
-
-  const openNewProjectModal = () => {
-    const techLabel =
-      PLANT_TECHNOLOGIES.find((t) => t.id === config.technology)?.label || config.technology;
-    setProjectNameInput(`${techLabel} ${config.installedPowerKw} kW (${config.voltage})`);
-    setContractNumInput(activeProject?.contractNumber || '');
-    setEanInput(activeProject?.eanCode || '');
-    setShowSaveProjectModal(true);
-  };
-
-  const handleCreateProjectSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!projectNameInput.trim()) return;
-    const nowIso = new Date().toISOString();
-    const newProj: SavedProject = {
-      id: `proj-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      name: projectNameInput.trim(),
-      contractNumber: contractNumInput.trim(),
-      eanCode: eanInput.trim(),
-      installedPowerKw: config.installedPowerKw,
-      category: config.category,
-      voltage: config.voltage,
-      technology: config.technology,
-      exportMode: config.exportMode,
-      flags: config.flags,
-      checkedIds,
-      itemNotes,
-      createdBy: dbState.uid || 'local-user',
-      createdAtIso: nowIso,
-      updatedAtIso: nowIso,
-    };
-
-    const saved = await upsertSavedProject(newProj, true);
-    if (dbState.mode === 'local') {
-      setProjects(loadLocalProjects());
-    }
-    setActiveProjectId(saved.id);
-    setShowSaveProjectModal(false);
-    showToast(
-      dbState.connected
-        ? `Projekt „${saved.name}“ uložen do sdílené Firebase databáze.`
-        : `Projekt „${saved.name}“ uložen.`
-    );
-  };
-
-  const handleQuickSaveActiveProject = async () => {
-    if (!activeProject) return;
-    await persistActiveProjectProgress(config, checkedIds, itemNotes);
-    showToast(`Projekt „${activeProject.name}“ aktualizován v databázi.`);
   };
 
   const handleSaveTemplateItem = async (item: ChecklistItemTemplate, isNew: boolean) => {
@@ -331,17 +224,8 @@ export function App() {
               allItems={items}
               checkedIds={checkedIds}
               itemNotes={itemNotes}
-              activeProject={activeProject}
               onToggleCheck={handleToggleCheck}
               onSaveItemNote={handleSaveItemNote}
-              onClearChecks={() => {
-                setCheckedIds([]);
-                if (activeProject) {
-                  persistActiveProjectProgress(config, [], itemNotes).catch(() => {});
-                }
-              }}
-              onOpenSaveProjectModal={openNewProjectModal}
-              onQuickSaveActiveProject={handleQuickSaveActiveProject}
               onEditTemplateItem={(item) => {
                 setEditingTemplateFromChecklist(item);
                 setActiveTab('DATABASE');
@@ -366,88 +250,6 @@ export function App() {
         ČEZ Distribuce · PPDS Příloha č. 4 &amp; RfG · Orientační pomůcka
       </footer>
 
-      {/* Save Project Modal */}
-      {showSaveProjectModal && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <form className="modal-panel" style={{ maxWidth: 460 }} onSubmit={handleCreateProjectSubmit}>
-            <div className="modal-header">
-              <h3>Uložit projekt</h3>
-              <button
-                type="button"
-                className="icon-btn"
-                onClick={() => setShowSaveProjectModal(false)}
-                aria-label="Zavřít"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <div className="field-group">
-                <label className="field-label" htmlFor="input-proj-name">
-                  Název projektu *
-                </label>
-                <input
-                  id="input-proj-name"
-                  type="text"
-                  required
-                  maxLength={140}
-                  className="text-input"
-                  value={projectNameInput}
-                  onChange={(e) => setProjectNameInput(e.target.value)}
-                  placeholder="FVE Hala Plzeň 99 kWp"
-                  autoFocus
-                />
-              </div>
-
-              <div className="form-row-2 field-group">
-                <div>
-                  <label className="field-label" htmlFor="input-proj-contract">
-                    Číslo SoP / žádosti
-                  </label>
-                  <input
-                    id="input-proj-contract"
-                    type="text"
-                    maxLength={30}
-                    className="text-input"
-                    value={contractNumInput}
-                    onChange={(e) => setContractNumInput(e.target.value)}
-                    placeholder="4120000000"
-                  />
-                </div>
-                <div>
-                  <label className="field-label" htmlFor="input-proj-ean">
-                    EAN
-                  </label>
-                  <input
-                    id="input-proj-ean"
-                    type="text"
-                    maxLength={25}
-                    className="text-input"
-                    value={eanInput}
-                    onChange={(e) => setEanInput(e.target.value)}
-                    placeholder="859182400..."
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setShowSaveProjectModal(false)}
-              >
-                Zrušit
-              </button>
-              <button type="submit" className="btn btn-accent">
-                Uložit
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
       {/* Firebase Cloud Setup Modal */}
       {showFirebaseModal && (
         <FirebaseSetupModal
@@ -468,7 +270,7 @@ export function App() {
             });
           }}
           onSyncLocalToCloud={async () => {
-            await syncLocalItemsAndProjectsToCloud(items, projects);
+            await syncLocalItemsAndProjectsToCloud(items, []);
           }}
           onShowToast={showToast}
         />
