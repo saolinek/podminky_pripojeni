@@ -1,0 +1,363 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// This security rules file assumes the following data structures and access
+// patterns for the collaborative ČEZ Distribuce connection checklist app:
+//
+// Collection: checklist_items
+// Document ID: {itemId} (alphanumeric, hyphens, underscores; 1..128 chars,
+//   e.g. "cez-01-mapa-pripojitelnosti" or "vlastni-<base36>")
+// Queries:
+//   - collection('checklist_items')
+//   - query(collection('checklist_items'), orderBy('order', 'asc'))
+// Collaborative Access:
+//   - Shared team workspace: authenticated users (Anonymous or Google Auth)
+//     may read, create, update, and delete checklist item templates, subject
+//     to strict schema/size/enum validation and creator/timestamp integrity.
+// Fields (all required):
+//   - title: string (required, 1..300 chars) - Requirement/document title
+//   - description: string (required, 1..2000 chars) - Detailed guidance
+//   - phase: string (required, PhaseId enum) - Process phase (1..6)
+//   - order: number (required, 0..100000) - Sort order for checklist display
+//   - reference: string (required, 0..200 chars) - Regulatory/PPDS reference
+//   - deadlineBadge: string (required, 0..100 chars) - Deadline hint label
+//   - mandatory: bool (required) - Whether requirement is mandatory
+//   - categories: list<PowerCategory> (required, 0..6 items) - Applicable RfG categories
+//   - voltages: list<VoltageLevel> (required, 0..3 items) - Applicable voltage levels
+//   - technologies: list<PlantTechnology> (required, 0..6 items) - Applicable plant types
+//   - exportModes: list<ExportMode> (required, 0..3 items) - Applicable grid export modes
+//   - requiredFlags: list<SpecialFlag> (required, 0..5 items) - Required condition flags
+//   - createdBy: string (required, 1..128 chars, immutable on update except built-in
+//     "cez-*" template re-seeding where it must equal request.auth.uid) - Creator UID
+//   - createdAt: timestamp (required, == request.time on create, immutable on update
+//     except creator/default batch re-seed where it must equal request.time)
+//   - updatedAt: timestamp (required, == request.time on create and update)
+//
+// Collection: projects
+// Document ID: {projectId} (alphanumeric, hyphens, underscores; 1..128 chars,
+//   e.g. "proj-<timestamp36>-<rand>")
+// Queries:
+//   - query(collection('projects'), orderBy('updatedAt', 'desc'))
+// Collaborative Access:
+//   - Shared team workspace: authenticated users may read, create, update,
+//     and delete saved plant projects (no PII stored), subject to strict
+//     schema/size/enum validation and immutable creator/timestamp protection.
+// Fields (all required):
+//   - name: string (required, 1..200 chars) - Project/plant label (non-PII)
+//   - contractNumber: string (required, 0..60 chars) - Optional SoP/application number
+//   - eanCode: string (required, 0..50 chars) - Optional 18-digit EAN code or empty
+//   - installedPowerKw: number (required, 0..1000000) - Installed capacity Pi in kW
+//   - category: string (required, PowerCategory enum) - Module category
+//   - voltage: string (required, VoltageLevel enum) - Connection voltage level
+//   - technology: string (required, PlantTechnology enum) - Generation/BESS technology
+//   - exportMode: string (required, ExportMode enum) - Grid export mode
+//   - flags: list<SpecialFlag> (required, 0..5 items) - Active site condition flags
+//   - checkedIds: list<string> (required, 0..250 valid item IDs) - Completed item IDs
+//   - itemNotes: map<string, string> (required, 0..250 entries, valid item ID keys,
+//     combined note text <= 50000 chars) - Per-item notes
+//   - createdBy: string (required, 1..128 chars, immutable; must equal request.auth.uid
+//     on create) - Creator UID
+//   - createdAt: timestamp (required, == request.time on create, immutable on update
+//     except idempotent batch re-sync by original creator where == request.time)
+//   - updatedAt: timestamp (required, == request.time on create and update)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the user is authenticated (Anonymous or Google Sign-In)
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the authenticated user matches a given UID
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Verify createdBy matches the authenticated user's UID
+    function uidUnchanged() {
+      return ('createdBy' in request.resource.data) &&
+        isOwner(request.resource.data.createdBy);
+    }
+
+    // Ensure createdBy is not modified relative to existing document
+    function uidNotModified() {
+      return ('createdBy' in request.resource.data) &&
+        request.resource.data.createdBy == resource.data.createdBy;
+    }
+
+    // Validate that all required fields exist on the resulting document
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // Validate strict schema (reject any extraneous/undeclared fields)
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Protect immutable fields from modification during partial updates
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // Validate document ID format and length
+    function isValidDocId(docId) {
+      return docId is string &&
+        docId.size() >= 1 &&
+        docId.size() <= 128 &&
+        docId.matches('^[A-Za-z0-9_-]+$');
+    }
+
+    // Check if itemId is one of the built-in ČEZ Distribuce default template IDs
+    function isDefaultCezItemId(itemId) {
+      return itemId.matches('^cez-[0-9]{2}[a-z]?-[a-z0-9-]+$');
+    }
+
+    // Validate string type and character length bounds
+    function validStringLength(val, minLen, maxLen) {
+      return val is string &&
+        val.size() >= minLen &&
+        val.size() <= maxLen;
+    }
+
+    // Validate finite numeric value within [minVal, maxVal] (also rejects NaN/Infinity)
+    function validNumberRange(val, minVal, maxVal) {
+      return val is number &&
+        val >= minVal &&
+        val <= maxVal;
+    }
+
+    // Deep array validation for enum lists: checks list type, max size, and every element
+    function isValidEnumList(listData, maxSize, allowedValues) {
+      return listData is list &&
+        listData.size() <= maxSize &&
+        listData.hasOnly(allowedValues);
+    }
+
+    // Deep array validation for checklist item ID lists (checkedIds)
+    function isValidIdList(listData, maxItems, maxJoinedLen) {
+      return listData is list &&
+        listData.size() <= maxItems &&
+        (
+          listData.size() == 0 ||
+          (
+            listData.join(',').size() <= maxJoinedLen &&
+            listData.join(',').matches('^[A-Za-z0-9_-]{1,128}(,[A-Za-z0-9_-]{1,128})*$')
+          )
+        );
+    }
+
+    // Deep map validation for itemNotes (Record<itemId, noteText>)
+    function isValidNotesMap(mapData, maxEntries, maxKeysJoinedLen, maxValuesJoinedLen) {
+      return mapData is map &&
+        mapData.size() <= maxEntries &&
+        (
+          mapData.size() == 0 ||
+          (
+            mapData.keys().join(',').size() <= maxKeysJoinedLen &&
+            mapData.keys().join(',').matches('^[A-Za-z0-9_-]{1,128}(,[A-Za-z0-9_-]{1,128})*$') &&
+            mapData.values().join('').size() <= maxValuesJoinedLen
+          )
+        );
+    }
+
+    // Allowed Enum Value Sets
+    function allowedPowerCategories() {
+      return ['MIKROZDROJ', 'A1', 'A2', 'B1', 'B2', 'C_D'];
+    }
+
+    function allowedVoltageLevels() {
+      return ['NN', 'VN', 'VVN'];
+    }
+
+    function allowedTechnologies() {
+      return ['FVE', 'FVE_BESS', 'BESS', 'KGJ', 'MVE', 'VTE'];
+    }
+
+    function allowedExportModes() {
+      return ['STANDARD_PRETOKY', 'MIKROZDROJ_BEZ_PRETOKU', 'NULOVY_REZERVOVANY_VYKON'];
+    }
+
+    function allowedPhases() {
+      return [
+        'FAZE_1_PRIPRAVA',
+        'FAZE_2_ZADOST_SOP',
+        'FAZE_3_PROJEKT_POVOLENI',
+        'FAZE_4_REALIZACE_MERENI',
+        'FAZE_5_UVEDENI_DO_PROVOZU',
+        'FAZE_6_OTE_OBCHODNIK'
+      ];
+    }
+
+    function allowedSpecialFlags() {
+      return [
+        'CIZI_NEMOVITOST',
+        'PLNA_MOC',
+        'OSTROVNI_PROVOZ',
+        'NAD_50_KW_LICENCE',
+        'NEPRIME_MERENI'
+      ];
+    }
+
+    // Verify creation metadata (creator UID + server timestamps)
+    function hasValidCreateMetadata() {
+      return uidUnchanged() &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time;
+    }
+
+    // ===============================================================
+    // Domain Validators (Used in BOTH create and update rules)
+    // ===============================================================
+
+    function isValidChecklistItem(data) {
+      let fields = [
+        'title',
+        'description',
+        'phase',
+        'order',
+        'reference',
+        'deadlineBadge',
+        'mandatory',
+        'categories',
+        'voltages',
+        'technologies',
+        'exportModes',
+        'requiredFlags',
+        'createdBy',
+        'createdAt',
+        'updatedAt'
+      ];
+      return hasRequiredFields(fields) &&
+        hasOnlyAllowedFields(fields) &&
+        validStringLength(data.title, 1, 300) &&
+        validStringLength(data.description, 1, 2000) &&
+        (data.phase is string && data.phase in allowedPhases()) &&
+        validNumberRange(data.order, 0, 100000) &&
+        validStringLength(data.reference, 0, 200) &&
+        validStringLength(data.deadlineBadge, 0, 100) &&
+        (data.mandatory is bool) &&
+        isValidEnumList(data.categories, 6, allowedPowerCategories()) &&
+        isValidEnumList(data.voltages, 3, allowedVoltageLevels()) &&
+        isValidEnumList(data.technologies, 6, allowedTechnologies()) &&
+        isValidEnumList(data.exportModes, 3, allowedExportModes()) &&
+        isValidEnumList(data.requiredFlags, 5, allowedSpecialFlags()) &&
+        validStringLength(data.createdBy, 1, 128) &&
+        (data.createdAt is timestamp) &&
+        (data.updatedAt is timestamp);
+    }
+
+    function isValidProject(data) {
+      let fields = [
+        'name',
+        'contractNumber',
+        'eanCode',
+        'installedPowerKw',
+        'category',
+        'voltage',
+        'technology',
+        'exportMode',
+        'flags',
+        'checkedIds',
+        'itemNotes',
+        'createdBy',
+        'createdAt',
+        'updatedAt'
+      ];
+      return hasRequiredFields(fields) &&
+        hasOnlyAllowedFields(fields) &&
+        validStringLength(data.name, 1, 200) &&
+        validStringLength(data.contractNumber, 0, 60) &&
+        validStringLength(data.eanCode, 0, 50) &&
+        validNumberRange(data.installedPowerKw, 0, 1000000) &&
+        (data.category is string && data.category in allowedPowerCategories()) &&
+        (data.voltage is string && data.voltage in allowedVoltageLevels()) &&
+        (data.technology is string && data.technology in allowedTechnologies()) &&
+        (data.exportMode is string && data.exportMode in allowedExportModes()) &&
+        // § 16 simplified microsource without export is strictly <= 10.8 kW on NN
+        (
+          data.exportMode != 'MIKROZDROJ_BEZ_PRETOKU' ||
+          (data.installedPowerKw <= 10.8 && data.voltage == 'NN' && data.category == 'MIKROZDROJ')
+        ) &&
+        isValidEnumList(data.flags, 5, allowedSpecialFlags()) &&
+        isValidIdList(data.checkedIds, 250, 20000) &&
+        isValidNotesMap(data.itemNotes, 250, 20000, 50000) &&
+        validStringLength(data.createdBy, 1, 128) &&
+        (data.createdAt is timestamp) &&
+        (data.updatedAt is timestamp);
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /checklist_items/{itemId} {
+      // Supports get and list with orderBy('order', 'asc') for authenticated collaborators
+      allow read: if isAuthenticated();
+
+      allow create: if isAuthenticated() &&
+        isValidDocId(itemId) &&
+        isValidChecklistItem(request.resource.data) &&
+        hasValidCreateMetadata();
+
+      // Supports collaborative updateDoc (createdBy & createdAt unchanged) as well as
+      // batch.set re-seeding of built-in "cez-*" defaults or creator's own local sync
+      allow update: if isAuthenticated() &&
+        isValidDocId(itemId) &&
+        isValidChecklistItem(request.resource.data) &&
+        request.resource.data.updatedAt == request.time &&
+        (
+          (areImmutableFieldsUnchanged(['createdBy', 'createdAt']) && uidNotModified()) ||
+          (
+            (isOwner(resource.data.createdBy) || isDefaultCezItemId(itemId)) &&
+            uidUnchanged() &&
+            request.resource.data.createdAt == request.time
+          )
+        );
+
+      allow delete: if isAuthenticated();
+    }
+
+    match /projects/{projectId} {
+      // Supports get and list with orderBy('updatedAt', 'desc') for authenticated collaborators
+      allow read: if isAuthenticated();
+
+      allow create: if isAuthenticated() &&
+        isValidDocId(projectId) &&
+        isValidProject(request.resource.data) &&
+        hasValidCreateMetadata();
+
+      // Supports collaborative updateDoc (createdBy & createdAt strictly unchanged) and
+      // idempotent batch.set cloud sync by the original creator
+      allow update: if isAuthenticated() &&
+        isValidDocId(projectId) &&
+        isValidProject(request.resource.data) &&
+        request.resource.data.updatedAt == request.time &&
+        (
+          (areImmutableFieldsUnchanged(['createdBy', 'createdAt']) && uidNotModified()) ||
+          (
+            isOwner(resource.data.createdBy) &&
+            uidUnchanged() &&
+            request.resource.data.createdAt == request.time
+          )
+        );
+
+      allow delete: if isAuthenticated();
+    }
+
+    // Default deny for all other collections and subcollections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
