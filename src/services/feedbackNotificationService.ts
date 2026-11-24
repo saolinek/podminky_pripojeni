@@ -1,0 +1,65 @@
+import { FEEDBACK_CATEGORIES, type FeedbackCategory } from '../types';
+
+export const FEEDBACK_NOTIFICATION_EMAIL = 'dobesmarek221@gmail.com';
+
+const FORMSUBMIT_ENDPOINT = `https://formsubmit.co/ajax/${encodeURIComponent(FEEDBACK_NOTIFICATION_EMAIL)}`;
+const CATEGORY_LABEL_MAP = new Map(FEEDBACK_CATEGORIES.map((c) => [c.id, c.label]));
+
+interface FormSubmitResponse {
+  success?: boolean | string;
+  message?: string;
+}
+
+export async function sendFeedbackEmailNotification(input: {
+  category: FeedbackCategory;
+  rating: number;
+  message: string;
+  authorName: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const categoryLabel = CATEGORY_LABEL_MAP.get(input.category) ?? 'Obecná zpráva';
+  const ratingText = input.rating > 0 ? `${input.rating} / 5` : 'Nevyplněno';
+  const authorText = input.authorName.trim() || 'Anonymní';
+
+  const payload = {
+    _subject: `Nová zpětná vazba (${categoryLabel}) · Připojení zdroje ČEZ`,
+    _template: 'table',
+    _captcha: 'false',
+    Typ: categoryLabel,
+    Hodnoceni: ratingText,
+    Autor: authorText,
+    Zprava: input.message.trim(),
+  };
+
+  try {
+    const res = await fetch(FORMSUBMIT_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = (await res.json().catch(() => ({}))) as FormSubmitResponse;
+    const isOk = res.ok && (data.success === true || data.success === 'true');
+    return {
+      ok: isOk,
+      message: data.message,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export async function sendTestFeedbackEmail(): Promise<{ ok: boolean; message?: string }> {
+  return sendFeedbackEmailNotification({
+    category: 'JINE',
+    rating: 5,
+    authorName: 'Superadmin (test)',
+    message:
+      'Testovací oznámení z aplikace Připojení zdroje ČEZ. Pokud vám tento e-mail dorazil, e-mailová upozornění na novou zpětnou vazbu fungují.',
+  });
+}
