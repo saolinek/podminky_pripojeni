@@ -20,6 +20,7 @@ interface ChecklistViewProps {
   allItems: ChecklistItemTemplate[];
   checkedIds: string[];
   itemNotes: Record<string, string>;
+  isAdmin: boolean;
   onToggleCheck: (itemId: string) => void;
   onSaveItemNote: (itemId: string, note: string) => void;
   onEditTemplateItem: (item: ChecklistItemTemplate) => void;
@@ -32,6 +33,7 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
   allItems,
   checkedIds,
   itemNotes,
+  isAdmin,
   onToggleCheck,
   onSaveItemNote,
   onEditTemplateItem,
@@ -231,16 +233,18 @@ export const ChecklistView: React.FC<ChecklistViewProps> = ({
                                 >
                                   <MessageSquare size={14} />
                                 </button>
-                                <button
-                                  id={`edit-db-item-${item.id}`}
-                                  type="button"
-                                  className="icon-btn sm"
-                                  onClick={() => onEditTemplateItem(item)}
-                                  title="Upravit podmínku"
-                                  aria-label="Upravit podmínku"
-                                >
-                                  <Edit3 size={14} />
-                                </button>
+                                {isAdmin && (
+                                  <button
+                                    id={`edit-db-item-${item.id}`}
+                                    type="button"
+                                    className="icon-btn sm"
+                                    onClick={() => onEditTemplateItem(item)}
+                                    title="Upravit podmínku"
+                                    aria-label="Upravit podmínku"
+                                  >
+                                    <Edit3 size={14} />
+                                  </button>
+                                )}
                               </div>
                             </div>
 

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CheckSquare,
+  Lock,
   SlidersHorizontal,
   Zap,
 } from 'lucide-react';
@@ -12,17 +13,31 @@ import {
 import {
   connectAndSubscribeFirebase,
   type DbConnectionState,
+  fetchAdminPasswordHash,
   type FirebaseClientConfig,
   getSavedFirebaseConfig,
+  isFirebaseConnected,
   loadLocalItems,
   removeChecklistItem,
   reorderChecklistItems,
+  saveAdminPasswordHash,
   seedDefaultsToFirestore,
   upsertChecklistItem,
 } from './services/firebaseService';
+import {
+  type AdminRole,
+  clearAdminSession,
+  hashPassword,
+  loadAdminSession,
+  loadCachedAdminHash,
+  saveAdminSession,
+  verifyCanChangeAdminPassword,
+  verifyLoginPassword,
+} from './services/adminAuthService';
 import { PlantConfigurator } from './components/PlantConfigurator';
 import { ChecklistView } from './components/ChecklistView';
 import { TemplateDatabaseView } from './components/TemplateDatabaseView';
+import { AdminLoginModal, ChangePasswordModal } from './components/AdminAuthModals';
 
 type ActiveTab = 'CHECKLIST' | 'DATABASE';
 
@@ -52,10 +67,23 @@ export function App() {
     error: '',
   });
 
+  const [adminHash, setAdminHash] = useState<string | null>(() => loadCachedAdminHash());
+  const adminHashSyncedRef = useRef(false);
+  const [adminRole, setAdminRole] = useState<AdminRole | null>(() =>
+    loadAdminSession(loadCachedAdminHash())
+  );
+  const adminRoleRef = useRef<AdminRole | null>(adminRole);
+  const [showAdminLoginModal, setShowAdminLoginModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+
   const [editingTemplateFromChecklist, setEditingTemplateFromChecklist] =
     useState<ChecklistItemTemplate | null>(null);
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    adminRoleRef.current = adminRole;
+  }, [adminRole]);
 
   const showToast = useCallback((msg: string) => {
     setToastMsg(msg);
@@ -67,13 +95,32 @@ export function App() {
     return () => window.clearTimeout(t);
   }, [toastMsg]);
 
-  const establishFirebase = useCallback(async (cfg: FirebaseClientConfig) => {
-    await connectAndSubscribeFirebase(cfg, {
-      onStateChange: (st) => setDbState(st),
-      onItemsUpdate: (cloudItems) => setItems(cloudItems),
-      onProjectsUpdate: () => {},
-    });
-  }, []);
+  const handleAdminHashSync = useCallback(
+    (cloudHash: string | null) => {
+      adminHashSyncedRef.current = true;
+      setAdminHash(cloudHash);
+      if (adminRoleRef.current === 'admin' && loadAdminSession(cloudHash) !== 'admin') {
+        clearAdminSession();
+        setAdminRole(null);
+        setShowChangePasswordModal(false);
+        setActiveTab('CHECKLIST');
+        showToast('Heslo admina bylo změněno. Přihlaste se prosím znovu.');
+      }
+    },
+    [showToast]
+  );
+
+  const establishFirebase = useCallback(
+    async (cfg: FirebaseClientConfig) => {
+      await connectAndSubscribeFirebase(cfg, {
+        onStateChange: (st) => setDbState(st),
+        onItemsUpdate: (cloudItems) => setItems(cloudItems),
+        onProjectsUpdate: () => {},
+        onAdminHashUpdate: handleAdminHashSync,
+      });
+    },
+    [handleAdminHashSync]
+  );
 
   useEffect(() => {
     const savedCfg = getSavedFirebaseConfig();
@@ -90,6 +137,81 @@ export function App() {
       });
     }
   }, [establishFirebase]);
+
+  const handleOpenDatabaseTab = () => {
+    if (adminRole) {
+      setActiveTab('DATABASE');
+    } else {
+      setShowAdminLoginModal(true);
+    }
+  };
+
+  const handleAdminLogin = async (
+    password: string
+  ): Promise<{ ok: boolean; error?: string }> => {
+    let latestHash = adminHash;
+    if (!adminHashSyncedRef.current && isFirebaseConnected()) {
+      try {
+        latestHash = await fetchAdminPasswordHash();
+        adminHashSyncedRef.current = true;
+        setAdminHash(latestHash);
+      } catch {
+        // Fallback to cached hash if fetch transiently fails
+      }
+    }
+
+    const role = verifyLoginPassword(password, latestHash);
+    if (!role) {
+      return { ok: false, error: 'Nesprávné heslo.' };
+    }
+
+    saveAdminSession(role, latestHash);
+    setAdminRole(role);
+    setShowAdminLoginModal(false);
+    setActiveTab('DATABASE');
+    showToast(role === 'superadmin' ? 'Přihlášen jako superadmin.' : 'Přihlášen jako admin.');
+    return { ok: true };
+  };
+
+  const handleChangeAdminPassword = async (
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ ok: boolean; error?: string }> => {
+    if (!adminRole) {
+      return { ok: false, error: 'Nejste přihlášen jako správce.' };
+    }
+
+    let latestHash = adminHash;
+    if (!adminHashSyncedRef.current && isFirebaseConnected()) {
+      try {
+        latestHash = await fetchAdminPasswordHash();
+        adminHashSyncedRef.current = true;
+        setAdminHash(latestHash);
+      } catch {
+        // Keep current hash
+      }
+    }
+
+    if (!verifyCanChangeAdminPassword(adminRole, currentPassword, latestHash)) {
+      return { ok: false, error: 'Současné heslo není správné.' };
+    }
+
+    const nextHash = hashPassword(newPassword);
+    await saveAdminPasswordHash(nextHash);
+    setAdminHash(nextHash);
+    saveAdminSession(adminRole, nextHash);
+    showToast('Heslo admina bylo úspěšně změněno.');
+    return { ok: true };
+  };
+
+  const handleAdminLogout = () => {
+    clearAdminSession();
+    setAdminRole(null);
+    setEditingTemplateFromChecklist(null);
+    setShowChangePasswordModal(false);
+    setActiveTab('CHECKLIST');
+    showToast('Správce byl odhlášen.');
+  };
 
   const handleToggleCheck = (itemId: string) => {
     const next = checkedIds.includes(itemId)
@@ -121,36 +243,68 @@ export function App() {
   };
 
   const handleSaveTemplateItem = async (item: ChecklistItemTemplate, isNew: boolean) => {
-    await upsertChecklistItem(item, isNew);
-    if (dbState.mode === 'local') {
-      setItems(loadLocalItems());
+    if (!adminRole) {
+      showToast('Úpravy podmínek vyžadují přihlášení správce.');
+      return;
     }
-    showToast(
-      isNew
-        ? `Nová podmínka „${item.title}“ přidána do databáze.`
-        : `Podmínka „${item.title}“ byla aktualizována.`
-    );
+    try {
+      await upsertChecklistItem(item, isNew);
+      if (dbState.mode === 'local') {
+        setItems(loadLocalItems());
+      }
+      showToast(
+        isNew
+          ? `Nová podmínka „${item.title}“ přidána do databáze.`
+          : `Podmínka „${item.title}“ byla aktualizována.`
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(`Chyba při ukládání podmínky: ${msg}`);
+      throw err;
+    }
   };
 
   const handleDeleteTemplateItem = async (id: string) => {
-    await removeChecklistItem(id);
-    if (dbState.mode === 'local') {
-      setItems(loadLocalItems());
+    if (!adminRole) {
+      showToast('Úpravy podmínek vyžadují přihlášení správce.');
+      return;
     }
-    showToast('Podmínka odstraněna z databáze.');
+    try {
+      await removeChecklistItem(id);
+      if (dbState.mode === 'local') {
+        setItems(loadLocalItems());
+      }
+      showToast('Podmínka odstraněna z databáze.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(`Chyba při mazání podmínky: ${msg}`);
+    }
   };
 
   const handleResetDefaults = async () => {
-    await seedDefaultsToFirestore();
-    if (dbState.mode === 'local') {
-      setItems(loadLocalItems());
+    if (!adminRole) {
+      showToast('Úpravy podmínek vyžadují přihlášení správce.');
+      return;
     }
-    showToast('Výchozí podmínky připojení ČEZ Distribuce byly obnoveny.');
+    try {
+      await seedDefaultsToFirestore();
+      if (dbState.mode === 'local') {
+        setItems(loadLocalItems());
+      }
+      showToast('Výchozí podmínky připojení ČEZ Distribuce byly obnoveny.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(`Chyba při obnovení podmínek: ${msg}`);
+    }
   };
 
   const handleReorderTemplateItems = async (
     updates: { id: string; phase: PhaseId; order: number }[]
   ) => {
+    if (!adminRole) {
+      showToast('Úpravy podmínek vyžadují přihlášení správce.');
+      return;
+    }
     if (updates.length === 0) return;
     const byId = new Map(updates.map((u) => [u.id, u]));
     setItems((prev) =>
@@ -167,6 +321,8 @@ export function App() {
     }
   };
 
+  const showingDatabase = activeTab === 'DATABASE' && adminRole !== null;
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -182,7 +338,7 @@ export function App() {
             <button
               id="nav-tab-checklist"
               type="button"
-              className={`nav-tab ${activeTab === 'CHECKLIST' ? 'active' : ''}`}
+              className={`nav-tab ${!showingDatabase ? 'active' : ''}`}
               onClick={() => setActiveTab('CHECKLIST')}
             >
               <CheckSquare size={15} />
@@ -192,10 +348,10 @@ export function App() {
             <button
               id="nav-tab-database"
               type="button"
-              className={`nav-tab ${activeTab === 'DATABASE' ? 'active' : ''}`}
-              onClick={() => setActiveTab('DATABASE')}
+              className={`nav-tab ${showingDatabase ? 'active' : ''}`}
+              onClick={handleOpenDatabaseTab}
             >
-              <SlidersHorizontal size={15} />
+              {adminRole ? <SlidersHorizontal size={15} /> : <Lock size={14} />}
               Podmínky
               <span className="nav-badge">{items.length}</span>
             </button>
@@ -204,7 +360,7 @@ export function App() {
       </header>
 
       <main className="main-container">
-        {activeTab === 'CHECKLIST' && (
+        {!showingDatabase && (
           <div className="workspace-grid">
             <PlantConfigurator
               config={config}
@@ -217,9 +373,14 @@ export function App() {
               allItems={items}
               checkedIds={checkedIds}
               itemNotes={itemNotes}
+              isAdmin={adminRole !== null}
               onToggleCheck={handleToggleCheck}
               onSaveItemNote={handleSaveItemNote}
               onEditTemplateItem={(item) => {
+                if (!adminRole) {
+                  setShowAdminLoginModal(true);
+                  return;
+                }
                 setEditingTemplateFromChecklist(item);
                 setActiveTab('DATABASE');
               }}
@@ -227,15 +388,18 @@ export function App() {
           </div>
         )}
 
-        {activeTab === 'DATABASE' && (
+        {showingDatabase && adminRole && (
           <TemplateDatabaseView
             items={items}
+            adminRole={adminRole}
             editingInitialItem={editingTemplateFromChecklist}
             onClearInitialEdit={() => setEditingTemplateFromChecklist(null)}
             onSaveItem={handleSaveTemplateItem}
             onDeleteItem={handleDeleteTemplateItem}
             onReorderItems={handleReorderTemplateItems}
             onResetDefaults={handleResetDefaults}
+            onOpenChangePassword={() => setShowChangePasswordModal(true)}
+            onLogout={handleAdminLogout}
           />
         )}
       </main>
@@ -243,6 +407,21 @@ export function App() {
       <footer className="app-footer">
         ČEZ Distribuce · PPDS Příloha č. 4 &amp; RfG · Orientační pomůcka
       </footer>
+
+      {showAdminLoginModal && (
+        <AdminLoginModal
+          onClose={() => setShowAdminLoginModal(false)}
+          onAuthenticate={handleAdminLogin}
+        />
+      )}
+
+      {showChangePasswordModal && adminRole && (
+        <ChangePasswordModal
+          role={adminRole}
+          onClose={() => setShowChangePasswordModal(false)}
+          onChangePassword={handleChangeAdminPassword}
+        />
+      )}
 
       {toastMsg && (
         <div className="toast-banner" role="status" aria-live="polite">

@@ -7,9 +7,12 @@ import {
   Download,
   Edit3,
   GripVertical,
+  KeyRound,
+  LogOut,
   Plus,
   RotateCcw,
   Search,
+  ShieldCheck,
   Trash2,
   X,
 } from 'lucide-react';
@@ -28,15 +31,19 @@ import {
   VOLTAGE_LEVELS,
   type VoltageLevel,
 } from '../types';
+import type { AdminRole } from '../services/adminAuthService';
 
 interface TemplateDatabaseViewProps {
   items: ChecklistItemTemplate[];
+  adminRole: AdminRole;
   editingInitialItem: ChecklistItemTemplate | null;
   onClearInitialEdit: () => void;
   onSaveItem: (item: ChecklistItemTemplate, isNew: boolean) => Promise<void>;
   onDeleteItem: (id: string) => Promise<void>;
   onReorderItems: (updates: { id: string; phase: PhaseId; order: number }[]) => Promise<void>;
   onResetDefaults: () => Promise<void>;
+  onOpenChangePassword: () => void;
+  onLogout: () => void;
 }
 
 function getPhaseBaseOrder(phaseId: PhaseId): number {
@@ -75,12 +82,15 @@ function createEmptyItem(phase: PhaseId, order: number): ChecklistItemTemplate {
 
 export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
   items,
+  adminRole,
   editingInitialItem,
   onClearInitialEdit,
   onSaveItem,
   onDeleteItem,
   onReorderItems,
   onResetDefaults,
+  onOpenChangePassword,
+  onLogout,
 }) => {
   const [search, setSearch] = useState('');
   const [phaseFilter, setPhaseFilter] = useState<string>('ALL');
@@ -297,11 +307,46 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
   return (
     <section aria-label="Databáze podmínek">
       <div className="section-head">
-        <h2>
-          Podmínky <span className="count">{items.length}</span>
-        </h2>
+        <div className="row">
+          <h2>
+            Podmínky <span className="count">{items.length}</span>
+          </h2>
+          <span
+            className={`role-badge ${adminRole === 'superadmin' ? 'superadmin' : ''}`}
+            title={
+              adminRole === 'superadmin'
+                ? 'Přihlášen jako superadmin (neměnné heslo)'
+                : 'Přihlášen jako admin'
+            }
+          >
+            <ShieldCheck size={13} />
+            {adminRole === 'superadmin' ? 'Superadmin' : 'Admin'}
+          </span>
+        </div>
 
         <div className="row">
+          <button
+            id="btn-change-admin-password"
+            type="button"
+            className="btn btn-secondary"
+            onClick={onOpenChangePassword}
+            title="Změnit heslo admina"
+          >
+            <KeyRound size={14} />
+            Změnit heslo
+          </button>
+
+          <button
+            id="btn-admin-logout"
+            type="button"
+            className="icon-btn bordered"
+            onClick={onLogout}
+            title="Odhlásit správce"
+            aria-label="Odhlásit správce"
+          >
+            <LogOut size={15} />
+          </button>
+
           <button
             id="btn-export-db-json"
             type="button"

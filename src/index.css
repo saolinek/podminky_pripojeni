@@ -1307,6 +1307,55 @@ h3 {
   flex: 1;
 }
 
+.modal-panel-sm {
+  max-width: 430px;
+}
+
+.modal-title-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.modal-lead {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.password-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-wrap .text-input {
+  padding-right: 2.4rem;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 0.35rem;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.16rem 0.55rem;
+  border-radius: var(--r-pill);
+  background: var(--subtle);
+  color: var(--ink-2);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.role-badge.superadmin {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .form-row-2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

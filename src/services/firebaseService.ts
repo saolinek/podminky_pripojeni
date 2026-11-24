@@ -15,6 +15,7 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  getDoc,
   getDocs,
   onSnapshot,
   query,
@@ -26,6 +27,7 @@ import {
 } from 'firebase/firestore';
 import type { ChecklistItemTemplate, PhaseId, SavedProject } from '../types';
 import { CEZ_DEFAULT_ITEMS } from '../data/cezDefaultItems';
+import { saveCachedAdminHash } from './adminAuthService';
 
 export interface FirebaseClientConfig {
   apiKey: string;
@@ -49,6 +51,7 @@ export interface DbConnectionState {
 const LS_FIREBASE_CFG = 'cez_pripojeni_firebase_cfg_v1';
 const LS_ITEMS_KEY = 'cez_pripojeni_items_v1';
 const LS_PROJECTS_KEY = 'cez_pripojeni_projects_v1';
+const ADMIN_CONFIG_DOC_ID = 'sys_admin_config';
 
 let currentApp: FirebaseApp | null = null;
 let currentAuth: Auth | null = null;
@@ -56,6 +59,7 @@ let currentDb: Firestore | null = null;
 let currentConfig: FirebaseClientConfig | null = null;
 let unsubItems: (() => void) | null = null;
 let unsubProjects: (() => void) | null = null;
+let unsubAdminConfig: (() => void) | null = null;
 
 const DEFAULT_FIREBASE_CONFIG: FirebaseClientConfig = {
   apiKey: 'AIzaSyD1fby84nt24fZEF2MUYs793KFOc-fWfrU',
@@ -254,6 +258,10 @@ export async function disconnectFirebase(): Promise<void> {
     unsubProjects();
     unsubProjects = null;
   }
+  if (unsubAdminConfig) {
+    unsubAdminConfig();
+    unsubAdminConfig = null;
+  }
   localStorage.removeItem(LS_FIREBASE_CFG);
   const url = new URL(window.location.href);
   if (url.searchParams.has('fb')) {
@@ -275,6 +283,7 @@ export async function connectAndSubscribeFirebase(
     onStateChange: (state: DbConnectionState) => void;
     onItemsUpdate: (items: ChecklistItemTemplate[]) => void;
     onProjectsUpdate: (projects: SavedProject[]) => void;
+    onAdminHashUpdate?: (hash: string | null) => void;
   }
 ): Promise<void> {
   if (unsubItems) {
@@ -284,6 +293,10 @@ export async function connectAndSubscribeFirebase(
   if (unsubProjects) {
     unsubProjects();
     unsubProjects = null;
+  }
+  if (unsubAdminConfig) {
+    unsubAdminConfig();
+    unsubAdminConfig = null;
   }
 
   for (const existing of getApps()) {
@@ -406,6 +419,24 @@ export async function connectAndSubscribeFirebase(
     }
   );
 
+  // Real-time listener on shared admin password hash
+  const adminDocRef = doc(db, 'projects', ADMIN_CONFIG_DOC_ID);
+  unsubAdminConfig = onSnapshot(
+    adminDocRef,
+    (docSnap) => {
+      const notes = docSnap.exists() ? docSnap.data()?.itemNotes : null;
+      const hash =
+        notes && typeof notes === 'object' && typeof notes.adminPasswordHash === 'string'
+          ? notes.adminPasswordHash
+          : null;
+      saveCachedAdminHash(hash);
+      callbacks.onAdminHashUpdate?.(hash);
+    },
+    () => {
+      // Ignore transient listener errors; login falls back to cached/fetched hash
+    }
+  );
+
   // Real-time listener on projects
   const projectsQuery = query(collection(db, 'projects'), orderBy('updatedAt', 'desc'));
   unsubProjects = onSnapshot(
@@ -413,6 +444,7 @@ export async function connectAndSubscribeFirebase(
     (snapshot) => {
       const projects: SavedProject[] = [];
       snapshot.forEach((docSnap) => {
+        if (docSnap.id === ADMIN_CONFIG_DOC_ID) return;
         const d = docSnap.data();
         projects.push({
           id: docSnap.id,
@@ -501,9 +533,11 @@ export async function upsertChecklistItem(
 ): Promise<ChecklistItemTemplate> {
   const nowIso = new Date().toISOString();
   const uid = currentAuth?.currentUser?.uid || item.createdBy || 'local-user';
-  const safeDescription = item.description.trim() || item.title.trim();
+  const safeTitle = item.title.trim();
+  const safeDescription = item.description.trim() || safeTitle;
   const updated: ChecklistItemTemplate = {
     ...item,
+    title: safeTitle,
     description: safeDescription,
     createdBy: isNew ? uid : item.createdBy || uid,
     updatedAtIso: nowIso,
@@ -597,6 +631,57 @@ export async function removeChecklistItem(id: string): Promise<void> {
     const next = loadLocalItems().filter((i) => i.id !== id);
     saveLocalItems(next);
   }
+}
+
+export async function fetchAdminPasswordHash(): Promise<string | null> {
+  if (!currentDb) return null;
+  const ref = doc(currentDb, 'projects', ADMIN_CONFIG_DOC_ID);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return null;
+  const notes = snap.data()?.itemNotes;
+  const hash =
+    notes && typeof notes === 'object' && typeof notes.adminPasswordHash === 'string'
+      ? notes.adminPasswordHash
+      : null;
+  saveCachedAdminHash(hash);
+  return hash;
+}
+
+export async function saveAdminPasswordHash(newHash: string): Promise<void> {
+  if (!currentDb) {
+    saveCachedAdminHash(newHash);
+    return;
+  }
+  const uid = currentAuth?.currentUser?.uid;
+  if (!uid) {
+    throw new Error('Databáze není přihlášena, heslo nelze uložit.');
+  }
+  const ref = doc(currentDb, 'projects', ADMIN_CONFIG_DOC_ID);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    await updateDoc(ref, {
+      itemNotes: { adminPasswordHash: newHash },
+      updatedAt: serverTimestamp(),
+    });
+  } else {
+    await setDoc(ref, {
+      name: '__admin_auth__',
+      contractNumber: '',
+      eanCode: '',
+      installedPowerKw: 0,
+      category: 'MIKROZDROJ',
+      voltage: 'NN',
+      technology: 'FVE',
+      exportMode: 'STANDARD_PRETOKY',
+      flags: [],
+      checkedIds: [],
+      itemNotes: { adminPasswordHash: newHash },
+      createdBy: uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  }
+  saveCachedAdminHash(newHash);
 }
 
 export async function upsertSavedProject(
