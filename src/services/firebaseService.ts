@@ -29,12 +29,18 @@ import {
   BUILTIN_PHASE_IDS,
   type BuiltInPhaseId,
   type ChecklistItemTemplate,
+  type CustomerType,
   type FeedbackCategory,
   type FeedbackEntry,
   PHASES,
   type PhaseGroup,
   type PhaseId,
+  type PiRange,
+  type RpRange,
   type SavedProject,
+  type VoltageLevel,
+  type VyrobnaType,
+  type YesNo,
 } from '../types';
 import { CEZ_DEFAULT_ITEMS } from '../data/cezDefaultItems';
 import { saveCachedAdminHash } from './adminAuthService';
@@ -59,7 +65,7 @@ export interface DbConnectionState {
 }
 
 const LS_FIREBASE_CFG = 'cez_pripojeni_firebase_cfg_v1';
-const LS_ITEMS_KEY = 'cez_pripojeni_items_v1';
+const LS_ITEMS_KEY = 'cez_pripojeni_items_v2';
 const LS_GROUPS_KEY = 'cez_pripojeni_groups_v1';
 const LS_PROJECTS_KEY = 'cez_pripojeni_projects_v1';
 const LS_FEEDBACK_KEY = 'cez_pripojeni_feedback_v1';
@@ -68,6 +74,151 @@ const FEEDBACK_DOC_PREFIX = 'fb-';
 
 const GROUPS_META_DOC_ID = 'meta_groups_v1';
 const CUSTOM_GROUP_PREFIX = 'grp:';
+const FILTER_V2_PREFIX = 'f2:';
+
+const CT_ENC: Record<CustomerType, string> = { LDS: 'L', ODBERATEL: 'O' };
+const CT_DEC: Record<string, CustomerType> = { L: 'LDS', O: 'ODBERATEL' };
+
+const PI_ENC: Record<PiRange, string> = {
+  DO_100: '0',
+  NAD_100: '1',
+  NAD_400: '4',
+  NAD_1000: 'k',
+};
+const PI_DEC: Record<string, PiRange> = {
+  '0': 'DO_100',
+  '1': 'NAD_100',
+  '4': 'NAD_400',
+  k: 'NAD_1000',
+};
+
+const RP_ENC: Record<RpRange, string> = { NAD_100: '1', NAD_1000: 'k' };
+const RP_DEC: Record<string, RpRange> = { '1': 'NAD_100', k: 'NAD_1000' };
+
+const YN_ENC: Record<YesNo, string> = { ANO: 'A', NE: 'N' };
+const YN_DEC: Record<string, YesNo> = { A: 'ANO', N: 'NE' };
+
+const VT_ENC: Record<VyrobnaType, string> = {
+  FVE: 'F',
+  ZUE: 'Z',
+  FVE_ZUE_SPOLECNY: 'S',
+  FVE_ZUE_SAMOSTATNE: 'M',
+  KGJ_SYNCHRONNI: 'Y',
+  KGJ_NESYNCHRONNI: 'N',
+};
+const VT_DEC: Record<string, VyrobnaType> = {
+  F: 'FVE',
+  Z: 'ZUE',
+  S: 'FVE_ZUE_SPOLECNY',
+  M: 'FVE_ZUE_SAMOSTATNE',
+  Y: 'KGJ_SYNCHRONNI',
+  N: 'KGJ_NESYNCHRONNI',
+};
+
+function encodeFiltersForFirestore(item: ChecklistItemTemplate): string {
+  const parts: string[] = [];
+  if (item.customerTypes.length > 0) {
+    parts.push(`ct=${item.customerTypes.map((x) => CT_ENC[x]).join(',')}`);
+  }
+  if (item.piRanges.length > 0) {
+    parts.push(`pi=${item.piRanges.map((x) => PI_ENC[x]).join(',')}`);
+  }
+  if (item.rpRanges.length > 0) {
+    parts.push(`rp=${item.rpRanges.map((x) => RP_ENC[x]).join(',')}`);
+  }
+  if (item.svrFilter.length > 0) {
+    parts.push(`svr=${item.svrFilter.map((x) => YN_ENC[x]).join(',')}`);
+  }
+  if (item.zueFilter.length > 0) {
+    parts.push(`zue=${item.zueFilter.map((x) => YN_ENC[x]).join(',')}`);
+  }
+  if (item.vyrobnaFilter.length > 0) {
+    parts.push(`vyr=${item.vyrobnaFilter.map((x) => YN_ENC[x]).join(',')}`);
+  }
+  if (item.vyrobnaTypes.length > 0) {
+    parts.push(`vt=${item.vyrobnaTypes.map((x) => VT_ENC[x]).join(',')}`);
+  }
+  return `${FILTER_V2_PREFIX}${parts.join(';')}`.slice(0, 200);
+}
+
+function decodeFiltersFromFirestore(rawRef: unknown): {
+  customerTypes: CustomerType[];
+  piRanges: PiRange[];
+  rpRanges: RpRange[];
+  svrFilter: YesNo[];
+  zueFilter: YesNo[];
+  vyrobnaFilter: YesNo[];
+  vyrobnaTypes: VyrobnaType[];
+  reference: string;
+} {
+  const str = String(rawRef || '');
+  const empty = {
+    customerTypes: [] as CustomerType[],
+    piRanges: [] as PiRange[],
+    rpRanges: [] as RpRange[],
+    svrFilter: [] as YesNo[],
+    zueFilter: [] as YesNo[],
+    vyrobnaFilter: [] as YesNo[],
+    vyrobnaTypes: [] as VyrobnaType[],
+    reference: str.startsWith(FILTER_V2_PREFIX) ? '' : str,
+  };
+  if (!str.startsWith(FILTER_V2_PREFIX)) {
+    return empty;
+  }
+  const body = str.slice(FILTER_V2_PREFIX.length);
+  if (!body) return empty;
+
+  for (const seg of body.split(';')) {
+    const eq = seg.indexOf('=');
+    if (eq < 0) continue;
+    const key = seg.slice(0, eq);
+    const vals = seg.slice(eq + 1).split(',').filter(Boolean);
+    if (key === 'ct') {
+      empty.customerTypes = vals.map((v) => CT_DEC[v]).filter((x): x is CustomerType => Boolean(x));
+    } else if (key === 'pi') {
+      empty.piRanges = vals.map((v) => PI_DEC[v]).filter((x): x is PiRange => Boolean(x));
+    } else if (key === 'rp') {
+      empty.rpRanges = vals.map((v) => RP_DEC[v]).filter((x): x is RpRange => Boolean(x));
+    } else if (key === 'svr') {
+      empty.svrFilter = vals.map((v) => YN_DEC[v]).filter((x): x is YesNo => Boolean(x));
+    } else if (key === 'zue') {
+      empty.zueFilter = vals.map((v) => YN_DEC[v]).filter((x): x is YesNo => Boolean(x));
+    } else if (key === 'vyr') {
+      empty.vyrobnaFilter = vals.map((v) => YN_DEC[v]).filter((x): x is YesNo => Boolean(x));
+    } else if (key === 'vt') {
+      empty.vyrobnaTypes = vals.map((v) => VT_DEC[v]).filter((x): x is VyrobnaType => Boolean(x));
+    }
+  }
+  return empty;
+}
+
+function filterValidVoltages(raw: unknown): VoltageLevel[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((v): v is VoltageLevel => v === 'NN' || v === 'VN');
+}
+
+function normalizeChecklistItem(raw: Partial<ChecklistItemTemplate>): ChecklistItemTemplate {
+  return {
+    id: String(raw.id || ''),
+    title: String(raw.title || ''),
+    description: String(raw.description || ''),
+    phase: String(raw.phase || 'FAZE_1_PRIPRAVA'),
+    order: Number(raw.order ?? 100),
+    reference: String(raw.reference || ''),
+    deadlineBadge: String(raw.deadlineBadge || ''),
+    mandatory: Boolean(raw.mandatory ?? true),
+    customerTypes: Array.isArray(raw.customerTypes) ? raw.customerTypes : [],
+    voltages: filterValidVoltages(raw.voltages),
+    piRanges: Array.isArray(raw.piRanges) ? raw.piRanges : [],
+    rpRanges: Array.isArray(raw.rpRanges) ? raw.rpRanges : [],
+    svrFilter: Array.isArray(raw.svrFilter) ? raw.svrFilter : [],
+    zueFilter: Array.isArray(raw.zueFilter) ? raw.zueFilter : [],
+    vyrobnaFilter: Array.isArray(raw.vyrobnaFilter) ? raw.vyrobnaFilter : [],
+    vyrobnaTypes: Array.isArray(raw.vyrobnaTypes) ? raw.vyrobnaTypes : [],
+    createdBy: String(raw.createdBy || 'system'),
+    updatedAtIso: String(raw.updatedAtIso || new Date().toISOString()),
+  };
+}
 
 let currentApp: FirebaseApp | null = null;
 let currentAuth: Auth | null = null;
@@ -276,9 +427,9 @@ export function loadLocalItems(): ChecklistItemTemplate[] {
   try {
     const raw = localStorage.getItem(LS_ITEMS_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as ChecklistItemTemplate[];
+      const parsed = JSON.parse(raw) as Partial<ChecklistItemTemplate>[];
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return [...parsed].sort((a, b) => a.order - b.order);
+        return parsed.map(normalizeChecklistItem).sort((a, b) => a.order - b.order);
       }
     }
   } catch {
@@ -487,20 +638,24 @@ export async function connectAndSubscribeFirebase(
         }
 
         const decoded = decodePhaseFromFirestore(d.phase, d.deadlineBadge);
+        const decodedFilters = decodeFiltersFromFirestore(d.reference);
         items.push({
           id: docSnap.id,
           title: String(d.title || ''),
           description: String(d.description || ''),
           phase: decoded.phase,
           order: Number(d.order ?? 100),
-          reference: String(d.reference || ''),
+          reference: decodedFilters.reference,
           deadlineBadge: decoded.deadlineBadge,
           mandatory: Boolean(d.mandatory ?? true),
-          categories: Array.isArray(d.categories) ? d.categories : [],
-          voltages: Array.isArray(d.voltages) ? d.voltages : [],
-          technologies: Array.isArray(d.technologies) ? d.technologies : [],
-          exportModes: Array.isArray(d.exportModes) ? d.exportModes : [],
-          requiredFlags: Array.isArray(d.requiredFlags) ? d.requiredFlags : [],
+          customerTypes: decodedFilters.customerTypes,
+          voltages: filterValidVoltages(d.voltages),
+          piRanges: decodedFilters.piRanges,
+          rpRanges: decodedFilters.rpRanges,
+          svrFilter: decodedFilters.svrFilter,
+          zueFilter: decodedFilters.zueFilter,
+          vyrobnaFilter: decodedFilters.vyrobnaFilter,
+          vyrobnaTypes: decodedFilters.vyrobnaTypes,
           createdBy: String(d.createdBy || 'system'),
           updatedAtIso: timestampToIso(d.updatedAt),
         });
@@ -581,12 +736,17 @@ export async function connectAndSubscribeFirebase(
           name: String(d.name || 'Nepojmenovaný zdroj'),
           contractNumber: String(d.contractNumber || ''),
           eanCode: String(d.eanCode || ''),
-          installedPowerKw: Number(d.installedPowerKw ?? 0),
-          category: d.category,
-          voltage: d.voltage,
-          technology: d.technology,
-          exportMode: d.exportMode,
-          flags: Array.isArray(d.flags) ? d.flags : [],
+          customerType: d.customerType === 'LDS' ? 'LDS' : 'ODBERATEL',
+          voltage: d.voltage === 'VN' ? 'VN' : 'NN',
+          pi:
+            d.pi === 'NAD_100' || d.pi === 'NAD_400' || d.pi === 'NAD_1000'
+              ? d.pi
+              : 'DO_100',
+          rp: d.rp === 'NAD_100' || d.rp === 'NAD_1000' ? d.rp : null,
+          svr: Boolean(d.svr),
+          zue: Boolean(d.zue),
+          vyrobna: Boolean(d.vyrobna),
+          vyrobnaType: d.vyrobnaType || null,
           checkedIds: Array.isArray(d.checkedIds) ? d.checkedIds : [],
           itemNotes: d.itemNotes && typeof d.itemNotes === 'object' ? d.itemNotes : {},
           createdBy: String(d.createdBy || ''),
@@ -638,19 +798,20 @@ export async function seedDefaultsToFirestore(): Promise<void> {
   const batch = writeBatch(currentDb);
   for (const item of CEZ_DEFAULT_ITEMS) {
     const ref = doc(currentDb, 'checklist_items', item.id);
+    const encoded = encodePhaseForFirestore(item.phase, item.deadlineBadge);
     batch.set(ref, {
       title: item.title,
       description: item.description,
-      phase: item.phase,
+      phase: encoded.phase,
       order: item.order,
-      reference: item.reference,
-      deadlineBadge: item.deadlineBadge,
+      reference: encodeFiltersForFirestore(item),
+      deadlineBadge: encoded.deadlineBadge,
       mandatory: item.mandatory,
-      categories: item.categories,
+      categories: [],
       voltages: item.voltages,
-      technologies: item.technologies,
-      exportModes: item.exportModes,
-      requiredFlags: item.requiredFlags,
+      technologies: [],
+      exportModes: [],
+      requiredFlags: [],
       createdBy: uid,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -678,20 +839,21 @@ export async function upsertChecklistItem(
   if (currentDb) {
     const ref = doc(currentDb, 'checklist_items', updated.id);
     const encoded = encodePhaseForFirestore(updated.phase, updated.deadlineBadge);
+    const encodedFilters = encodeFiltersForFirestore(updated);
     if (isNew) {
       await setDoc(ref, {
         title: updated.title,
         description: updated.description,
         phase: encoded.phase,
         order: updated.order,
-        reference: updated.reference,
+        reference: encodedFilters,
         deadlineBadge: encoded.deadlineBadge,
         mandatory: updated.mandatory,
-        categories: updated.categories,
+        categories: [],
         voltages: updated.voltages,
-        technologies: updated.technologies,
-        exportModes: updated.exportModes,
-        requiredFlags: updated.requiredFlags,
+        technologies: [],
+        exportModes: [],
+        requiredFlags: [],
         createdBy: uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -702,14 +864,14 @@ export async function upsertChecklistItem(
         description: updated.description,
         phase: encoded.phase,
         order: updated.order,
-        reference: updated.reference,
+        reference: encodedFilters,
         deadlineBadge: encoded.deadlineBadge,
         mandatory: updated.mandatory,
-        categories: updated.categories,
+        categories: [],
         voltages: updated.voltages,
-        technologies: updated.technologies,
-        exportModes: updated.exportModes,
-        requiredFlags: updated.requiredFlags,
+        technologies: [],
+        exportModes: [],
+        requiredFlags: [],
         updatedAt: serverTimestamp(),
       });
     }
@@ -898,12 +1060,12 @@ export async function upsertSavedProject(
         name: saved.name,
         contractNumber: saved.contractNumber,
         eanCode: saved.eanCode,
-        installedPowerKw: saved.installedPowerKw,
-        category: saved.category,
+        installedPowerKw: 0,
+        category: 'MIKROZDROJ',
         voltage: saved.voltage,
-        technology: saved.technology,
-        exportMode: saved.exportMode,
-        flags: saved.flags,
+        technology: 'FVE',
+        exportMode: 'STANDARD_PRETOKY',
+        flags: [],
         checkedIds: saved.checkedIds,
         itemNotes: saved.itemNotes,
         createdBy: uid,
@@ -915,12 +1077,12 @@ export async function upsertSavedProject(
         name: saved.name,
         contractNumber: saved.contractNumber,
         eanCode: saved.eanCode,
-        installedPowerKw: saved.installedPowerKw,
-        category: saved.category,
+        installedPowerKw: 0,
+        category: 'MIKROZDROJ',
         voltage: saved.voltage,
-        technology: saved.technology,
-        exportMode: saved.exportMode,
-        flags: saved.flags,
+        technology: 'FVE',
+        exportMode: 'STANDARD_PRETOKY',
+        flags: [],
         checkedIds: saved.checkedIds,
         itemNotes: saved.itemNotes,
         updatedAt: serverTimestamp(),
@@ -959,19 +1121,20 @@ export async function syncLocalItemsAndProjectsToCloud(
 
   for (const item of items) {
     const ref = doc(currentDb, 'checklist_items', item.id);
+    const encoded = encodePhaseForFirestore(item.phase, item.deadlineBadge);
     batch.set(ref, {
       title: item.title,
       description: item.description,
-      phase: item.phase,
+      phase: encoded.phase,
       order: item.order,
-      reference: item.reference,
-      deadlineBadge: item.deadlineBadge,
+      reference: encodeFiltersForFirestore(item),
+      deadlineBadge: encoded.deadlineBadge,
       mandatory: item.mandatory,
-      categories: item.categories,
+      categories: [],
       voltages: item.voltages,
-      technologies: item.technologies,
-      exportModes: item.exportModes,
-      requiredFlags: item.requiredFlags,
+      technologies: [],
+      exportModes: [],
+      requiredFlags: [],
       createdBy: uid,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -984,12 +1147,12 @@ export async function syncLocalItemsAndProjectsToCloud(
       name: p.name,
       contractNumber: p.contractNumber,
       eanCode: p.eanCode,
-      installedPowerKw: p.installedPowerKw,
-      category: p.category,
+      installedPowerKw: 0,
+      category: 'MIKROZDROJ',
       voltage: p.voltage,
-      technology: p.technology,
-      exportMode: p.exportMode,
-      flags: p.flags,
+      technology: 'FVE',
+      exportMode: 'STANDARD_PRETOKY',
+      flags: [],
       checkedIds: p.checkedIds,
       itemNotes: p.itemNotes,
       createdBy: uid,

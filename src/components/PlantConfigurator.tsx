@@ -1,18 +1,16 @@
 import React from 'react';
-import { AlertTriangle, Info, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import {
-  EXPORT_MODES,
-  type ExportMode,
-  inferCategoryAndDefaults,
-  PLANT_TECHNOLOGIES,
+  CUSTOMER_TYPES,
+  type CustomerType,
+  PI_RANGES,
+  type PiRange,
   type PlantConfig,
-  type PlantTechnology,
-  POWER_CATEGORIES,
-  type PowerCategory,
-  SPECIAL_FLAGS,
-  type SpecialFlag,
+  RP_RANGES,
+  type RpRange,
   VOLTAGE_LEVELS,
   type VoltageLevel,
+  type VyrobnaType,
 } from '../types';
 
 interface PlantConfiguratorProps {
@@ -21,103 +19,66 @@ interface PlantConfiguratorProps {
   onResetConfig: () => void;
 }
 
-const POWER_PRESETS = [
-  { label: '3,7 kW (1f)', value: 3.7 },
-  { label: '9,9 kW', value: 9.9 },
-  { label: '10,8 kW', value: 10.8 },
-  { label: '29,9 kW', value: 29.9 },
-  { label: '49,9 kW', value: 49.9 },
-  { label: '99 kW', value: 99 },
-  { label: '250 kW', value: 250 },
-  { label: '1 500 kW', value: 1500 },
-];
+type VyrobnaMainChoice = 'FVE' | 'ZUE' | 'FVE_ZUE' | 'KGJ';
+
+function getVyrobnaMainChoice(type: VyrobnaType | null): VyrobnaMainChoice | null {
+  if (!type) return null;
+  if (type === 'FVE') return 'FVE';
+  if (type === 'ZUE') return 'ZUE';
+  if (type === 'FVE_ZUE_SPOLECNY' || type === 'FVE_ZUE_SAMOSTATNE') return 'FVE_ZUE';
+  if (type === 'KGJ_SYNCHRONNI' || type === 'KGJ_NESYNCHRONNI') return 'KGJ';
+  return null;
+}
 
 export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
   config,
   onChange,
   onResetConfig,
 }) => {
-  const handlePowerChange = (raw: string) => {
-    const parsed = parseFloat(raw.replace(',', '.'));
-    if (Number.isNaN(parsed)) {
-      onChange({ ...config, installedPowerKw: 0 });
-      return;
-    }
-    onChange(inferCategoryAndDefaults(parsed, config));
-  };
+  const vyrobnaMain = getVyrobnaMainChoice(config.vyrobnaType);
 
-  const handleCategoryChange = (category: PowerCategory) => {
-    let nextExport = config.exportMode;
-    let nextVoltage = config.voltage;
-    if (category !== 'MIKROZDROJ' && nextExport === 'MIKROZDROJ_BEZ_PRETOKU') {
-      nextExport = 'STANDARD_PRETOKY';
-    }
-    if (category === 'MIKROZDROJ') {
-      nextVoltage = 'NN';
-    }
-    onChange({
-      ...config,
-      category,
-      voltage: nextVoltage,
-      exportMode: nextExport,
-    });
+  const handleCustomerTypeChange = (customerType: CustomerType) => {
+    onChange({ ...config, customerType });
   };
 
   const handleVoltageChange = (voltage: VoltageLevel) => {
-    const nextFlags = new Set<SpecialFlag>(config.flags);
-    let nextExport = config.exportMode;
-    let nextCat = config.category;
+    onChange({ ...config, voltage });
+  };
 
-    if (voltage !== 'NN') {
-      nextFlags.add('NEPRIME_MERENI');
-      if (nextExport === 'MIKROZDROJ_BEZ_PRETOKU') {
-        nextExport = 'STANDARD_PRETOKY';
-      }
-      if (nextCat === 'MIKROZDROJ') {
-        nextCat = 'A1';
-      }
-    }
+  const handlePiChange = (pi: PiRange) => {
+    onChange({ ...config, pi });
+  };
 
+  const handleRpToggle = (rp: RpRange) => {
+    onChange({ ...config, rp: config.rp === rp ? null : rp });
+  };
+
+  const handleVyrobnaToggle = (vyrobna: boolean) => {
     onChange({
       ...config,
-      voltage,
-      category: nextCat,
-      exportMode: nextExport,
-      flags: Array.from(nextFlags),
+      vyrobna,
+      vyrobnaType: vyrobna ? config.vyrobnaType : null,
     });
   };
 
-  const handleTechChange = (technology: PlantTechnology) => {
-    onChange({ ...config, technology });
-  };
-
-  const handleExportModeChange = (exportMode: ExportMode) => {
-    if (exportMode === 'MIKROZDROJ_BEZ_PRETOKU') {
-      const clampedPower = config.installedPowerKw > 10.8 ? 10.8 : config.installedPowerKw;
-      const flags = config.flags.filter((f) => f !== 'NAD_50_KW_LICENCE' && f !== 'NEPRIME_MERENI');
-      onChange({
-        ...config,
-        installedPowerKw: clampedPower,
-        category: 'MIKROZDROJ',
-        voltage: 'NN',
-        exportMode,
-        flags,
-      });
-      return;
+  const handleVyrobnaMainClick = (main: VyrobnaMainChoice) => {
+    if (main === 'FVE') {
+      onChange({ ...config, vyrobnaType: 'FVE' });
+    } else if (main === 'ZUE') {
+      onChange({ ...config, vyrobnaType: 'ZUE' });
+    } else if (main === 'FVE_ZUE') {
+      const next: VyrobnaType =
+        config.vyrobnaType === 'FVE_ZUE_SAMOSTATNE' ? 'FVE_ZUE_SAMOSTATNE' : 'FVE_ZUE_SPOLECNY';
+      onChange({ ...config, vyrobnaType: next });
+    } else if (main === 'KGJ') {
+      const next: VyrobnaType =
+        config.vyrobnaType === 'KGJ_NESYNCHRONNI' ? 'KGJ_NESYNCHRONNI' : 'KGJ_SYNCHRONNI';
+      onChange({ ...config, vyrobnaType: next });
     }
-    onChange({ ...config, exportMode });
-  };
-
-  const toggleFlag = (flag: SpecialFlag) => {
-    const has = config.flags.includes(flag);
-    const nextFlags = has
-      ? config.flags.filter((f) => f !== flag)
-      : [...config.flags, flag];
-    onChange({ ...config, flags: nextFlags });
   };
 
   return (
-    <aside className="surface-card config-sticky" aria-label="Konfigurátor výrobny">
+    <aside className="surface-card config-sticky" aria-label="Konfigurátor zdroje">
       <div className="card-header">
         <h2 className="card-title">Parametry zdroje</h2>
         <button
@@ -134,53 +95,17 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
 
       <div className="card-body">
         <div className="field-group">
-          <span className="field-label">Technologie</span>
-          <div className="choice-grid-2">
-            {PLANT_TECHNOLOGIES.map((tech) => (
+          <span className="field-label">Typ odběratele</span>
+          <div className="segmented-2">
+            {CUSTOMER_TYPES.map((ct) => (
               <button
-                key={tech.id}
-                id={`tech-btn-${tech.id}`}
+                key={ct.id}
+                id={`customer-btn-${ct.id}`}
                 type="button"
-                className={`choice-btn ${config.technology === tech.id ? 'selected' : ''}`}
-                onClick={() => handleTechChange(tech.id)}
-                title={tech.sub}
+                className={`choice-btn ${config.customerType === ct.id ? 'selected' : ''}`}
+                onClick={() => handleCustomerTypeChange(ct.id)}
               >
-                {tech.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="field-group">
-          <label htmlFor="input-installed-power" className="field-label">
-            Instalovaný výkon (Pi)
-          </label>
-          <div className="power-input-wrap">
-            <input
-              id="input-installed-power"
-              type="number"
-              min={0.1}
-              max={500000}
-              step="0.1"
-              className="power-input"
-              value={config.installedPowerKw || ''}
-              onChange={(e) => handlePowerChange(e.target.value)}
-              placeholder="9.9"
-            />
-            <span className="power-unit">kW</span>
-          </div>
-          <div className="preset-chips">
-            {POWER_PRESETS.map((preset) => (
-              <button
-                key={preset.value}
-                id={`preset-kw-${preset.value}`}
-                type="button"
-                className={`preset-chip ${
-                  Math.abs(config.installedPowerKw - preset.value) < 0.01 ? 'active' : ''
-                }`}
-                onClick={() => onChange(inferCategoryAndDefaults(preset.value, config))}
-              >
-                {preset.label}
+                {ct.label}
               </button>
             ))}
           </div>
@@ -188,7 +113,7 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
 
         <div className="field-group">
           <span className="field-label">Napěťová hladina</span>
-          <div className="choice-grid-3">
+          <div className="segmented-2">
             {VOLTAGE_LEVELS.map((v) => (
               <button
                 key={v.id}
@@ -205,99 +130,200 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
         </div>
 
         <div className="field-group">
-          <label htmlFor="select-rfg-category" className="field-label">
-            Kategorie RfG
-          </label>
-          <select
-            id="select-rfg-category"
-            className="select-input"
-            value={config.category}
-            onChange={(e) => handleCategoryChange(e.target.value as PowerCategory)}
-          >
-            {POWER_CATEGORIES.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.label} · {cat.rangeLabel}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="field-group">
-          <label htmlFor="select-export-mode" className="field-label">
-            Přetoky do sítě
-          </label>
-          <select
-            id="select-export-mode"
-            className="select-input"
-            value={config.exportMode}
-            onChange={(e) => handleExportModeChange(e.target.value as ExportMode)}
-          >
-            {EXPORT_MODES.map((m) => (
-              <option
-                key={m.id}
-                value={m.id}
-                disabled={
-                  m.id === 'MIKROZDROJ_BEZ_PRETOKU' &&
-                  (config.installedPowerKw > 10.8 || config.voltage !== 'NN')
-                }
+          <span className="field-label">Pi</span>
+          <div className="choice-grid-2">
+            {PI_RANGES.map((p) => (
+              <button
+                key={p.id}
+                id={`pi-btn-${p.id}`}
+                type="button"
+                className={`choice-btn ${config.pi === p.id ? 'selected' : ''}`}
+                onClick={() => handlePiChange(p.id)}
               >
-                {m.label}
-              </option>
+                {p.label}
+              </button>
             ))}
-          </select>
-        </div>
-
-        <div className="field-group">
-          <span className="field-label">Další podmínky</span>
-          <div className="flags-list">
-            {SPECIAL_FLAGS.map((flag) => {
-              const checked = config.flags.includes(flag.id);
-              return (
-                <label
-                  key={flag.id}
-                  htmlFor={`flag-chk-${flag.id}`}
-                  className={`flag-toggle ${checked ? 'checked' : ''}`}
-                  title={flag.hint}
-                >
-                  <input
-                    id={`flag-chk-${flag.id}`}
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleFlag(flag.id)}
-                  />
-                  <span>{flag.label}</span>
-                </label>
-              );
-            })}
           </div>
         </div>
 
-        <div className="reg-alerts">
-          {config.installedPowerKw <= 3.7 && config.voltage === 'NN' && (
-            <div className="reg-alert info">
-              <Info size={15} />
-              <span>Do 3,7 kVA lze připojit jednofázově.</span>
-            </div>
-          )}
+        <div className="field-group">
+          <div className="field-label-row">
+            <span className="field-label">Rp</span>
+            <span className="field-hint">nepovinné</span>
+          </div>
+          <div className="choice-grid-2">
+            {RP_RANGES.map((r) => (
+              <button
+                key={r.id}
+                id={`rp-btn-${r.id}`}
+                type="button"
+                className={`choice-btn ${config.rp === r.id ? 'selected' : ''}`}
+                onClick={() => handleRpToggle(r.id)}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-          {config.exportMode === 'MIKROZDROJ_BEZ_PRETOKU' && (
-            <div className="reg-alert warn">
-              <AlertTriangle size={15} />
-              <span>Pr = 0 kW — přetoky do DS jsou penalizovány.</span>
-            </div>
-          )}
+        <div className="field-group">
+          <span className="field-label">SVR</span>
+          <div className="segmented-2">
+            <button
+              id="svr-btn-ANO"
+              type="button"
+              className={`choice-btn ${config.svr ? 'selected' : ''}`}
+              onClick={() => onChange({ ...config, svr: true })}
+            >
+              Ano
+            </button>
+            <button
+              id="svr-btn-NE"
+              type="button"
+              className={`choice-btn ${!config.svr ? 'selected' : ''}`}
+              onClick={() => onChange({ ...config, svr: false })}
+            >
+              Ne
+            </button>
+          </div>
+        </div>
 
-          {config.installedPowerKw > 50 && config.installedPowerKw < 100 && (
-            <div className="reg-alert warn">
-              <AlertTriangle size={15} />
-              <span>Nad 50 kW nutná licence ERÚ; řízení na NN přes HDO.</span>
-            </div>
-          )}
+        <div className="field-group">
+          <span className="field-label">ZUE</span>
+          <div className="segmented-2">
+            <button
+              id="zue-btn-ANO"
+              type="button"
+              className={`choice-btn ${config.zue ? 'selected' : ''}`}
+              onClick={() => onChange({ ...config, zue: true })}
+            >
+              Ano
+            </button>
+            <button
+              id="zue-btn-NE"
+              type="button"
+              className={`choice-btn ${!config.zue ? 'selected' : ''}`}
+              onClick={() => onChange({ ...config, zue: false })}
+            >
+              Ne
+            </button>
+          </div>
+        </div>
 
-          {(config.installedPowerKw >= 100 || ['B1', 'B2', 'C_D'].includes(config.category)) && (
-            <div className="reg-alert warn">
-              <AlertTriangle size={15} />
-              <span>Od 100 kW povinná ŘJ se SIM, telemetrie, MPP a UPOS.</span>
+        <div className="field-group">
+          <span className="field-label">Výrobna</span>
+          <div className="segmented-2">
+            <button
+              id="vyrobna-btn-ANO"
+              type="button"
+              className={`choice-btn ${config.vyrobna ? 'selected' : ''}`}
+              onClick={() => handleVyrobnaToggle(true)}
+            >
+              Ano
+            </button>
+            <button
+              id="vyrobna-btn-NE"
+              type="button"
+              className={`choice-btn ${!config.vyrobna ? 'selected' : ''}`}
+              onClick={() => handleVyrobnaToggle(false)}
+            >
+              Ne
+            </button>
+          </div>
+
+          {config.vyrobna && (
+            <div className="vyrobna-subpanel">
+              <span className="field-label">Typ výrobny</span>
+              <div className="vyrobna-type-list">
+                <button
+                  id="vyrobna-type-FVE"
+                  type="button"
+                  className={`choice-btn ${vyrobnaMain === 'FVE' ? 'selected' : ''}`}
+                  onClick={() => handleVyrobnaMainClick('FVE')}
+                >
+                  FVE
+                </button>
+                <button
+                  id="vyrobna-type-ZUE"
+                  type="button"
+                  className={`choice-btn ${vyrobnaMain === 'ZUE' ? 'selected' : ''}`}
+                  onClick={() => handleVyrobnaMainClick('ZUE')}
+                >
+                  ZUE
+                </button>
+                <button
+                  id="vyrobna-type-FVE_ZUE"
+                  type="button"
+                  className={`choice-btn ${vyrobnaMain === 'FVE_ZUE' ? 'selected' : ''}`}
+                  onClick={() => handleVyrobnaMainClick('FVE_ZUE')}
+                >
+                  FVE + ZUE
+                </button>
+                <button
+                  id="vyrobna-type-KGJ"
+                  type="button"
+                  className={`choice-btn ${vyrobnaMain === 'KGJ' ? 'selected' : ''}`}
+                  onClick={() => handleVyrobnaMainClick('KGJ')}
+                >
+                  KGJ / bioplyn / diesel
+                </button>
+              </div>
+
+              {vyrobnaMain === 'FVE_ZUE' && (
+                <div className="vyrobna-subtype-wrap">
+                  <span className="field-label">Zapojení FVE + ZUE</span>
+                  <div className="segmented-2">
+                    <button
+                      id="vyrobna-sub-FVE_ZUE_SPOLECNY"
+                      type="button"
+                      className={`choice-btn ${
+                        config.vyrobnaType === 'FVE_ZUE_SPOLECNY' ? 'selected' : ''
+                      }`}
+                      onClick={() => onChange({ ...config, vyrobnaType: 'FVE_ZUE_SPOLECNY' })}
+                    >
+                      Společný střídač
+                    </button>
+                    <button
+                      id="vyrobna-sub-FVE_ZUE_SAMOSTATNE"
+                      type="button"
+                      className={`choice-btn ${
+                        config.vyrobnaType === 'FVE_ZUE_SAMOSTATNE' ? 'selected' : ''
+                      }`}
+                      onClick={() => onChange({ ...config, vyrobnaType: 'FVE_ZUE_SAMOSTATNE' })}
+                    >
+                      Samostatně
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {vyrobnaMain === 'KGJ' && (
+                <div className="vyrobna-subtype-wrap">
+                  <span className="field-label">Typ generátoru</span>
+                  <div className="segmented-2">
+                    <button
+                      id="vyrobna-sub-KGJ_SYNCHRONNI"
+                      type="button"
+                      className={`choice-btn ${
+                        config.vyrobnaType === 'KGJ_SYNCHRONNI' ? 'selected' : ''
+                      }`}
+                      onClick={() => onChange({ ...config, vyrobnaType: 'KGJ_SYNCHRONNI' })}
+                    >
+                      Synchronní
+                    </button>
+                    <button
+                      id="vyrobna-sub-KGJ_NESYNCHRONNI"
+                      type="button"
+                      className={`choice-btn ${
+                        config.vyrobnaType === 'KGJ_NESYNCHRONNI' ? 'selected' : ''
+                      }`}
+                      onClick={() => onChange({ ...config, vyrobnaType: 'KGJ_NESYNCHRONNI' })}
+                    >
+                      Nesynchronní
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

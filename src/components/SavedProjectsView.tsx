@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { Plus, Search, Trash2 } from 'lucide-react';
 import {
   type ChecklistItemTemplate,
+  CUSTOMER_TYPES,
   matchesPlantConfig,
-  PLANT_TECHNOLOGIES,
-  POWER_CATEGORIES,
+  PI_RANGES,
   type SavedProject,
+  VYROBNA_TYPES,
 } from '../types';
 
 interface SavedProjectsViewProps {
@@ -88,12 +89,14 @@ export const SavedProjectsView: React.FC<SavedProjectsViewProps> = ({
           {filtered.map((proj) => {
             const relevantItems = allItems.filter((item) =>
               matchesPlantConfig(item, {
-                installedPowerKw: proj.installedPowerKw,
-                category: proj.category,
+                customerType: proj.customerType,
                 voltage: proj.voltage,
-                technology: proj.technology,
-                exportMode: proj.exportMode,
-                flags: proj.flags,
+                pi: proj.pi,
+                rp: proj.rp,
+                svr: proj.svr,
+                zue: proj.zue,
+                vyrobna: proj.vyrobna,
+                vyrobnaType: proj.vyrobnaType,
               })
             );
             const checkedSet = new Set(proj.checkedIds);
@@ -101,10 +104,12 @@ export const SavedProjectsView: React.FC<SavedProjectsViewProps> = ({
             const total = relevantItems.length;
             const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
-            const catLabel =
-              POWER_CATEGORIES.find((c) => c.id === proj.category)?.label || proj.category;
-            const techLabel =
-              PLANT_TECHNOLOGIES.find((t) => t.id === proj.technology)?.label || proj.technology;
+            const customerLabel =
+              CUSTOMER_TYPES.find((c) => c.id === proj.customerType)?.label || proj.customerType;
+            const piLabel = PI_RANGES.find((p) => p.id === proj.pi)?.label || proj.pi;
+            const vyrobnaLabel = proj.vyrobnaType
+              ? VYROBNA_TYPES.find((t) => t.id === proj.vyrobnaType)?.label || proj.vyrobnaType
+              : null;
             const isActive = proj.id === activeProjectId;
 
             return (
@@ -135,10 +140,10 @@ export const SavedProjectsView: React.FC<SavedProjectsViewProps> = ({
                   </div>
 
                   <div className="spec-pills">
-                    <span className="spec-pill highlight">{catLabel}</span>
-                    <span className="spec-pill">{proj.installedPowerKw} kW</span>
+                    <span className="spec-pill highlight">{customerLabel}</span>
                     <span className="spec-pill">{proj.voltage}</span>
-                    <span className="spec-pill">{techLabel}</span>
+                    <span className="spec-pill">Pi {piLabel}</span>
+                    {vyrobnaLabel && <span className="spec-pill">{vyrobnaLabel}</span>}
                     {proj.contractNumber && (
                       <span className="spec-pill">SoP {proj.contractNumber}</span>
                     )}

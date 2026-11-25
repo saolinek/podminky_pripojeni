@@ -16,18 +16,20 @@ import {
 } from 'lucide-react';
 import {
   type ChecklistItemTemplate,
-  EXPORT_MODES,
-  type ExportMode,
+  CUSTOMER_TYPES,
+  type CustomerType,
   type PhaseGroup,
   type PhaseId,
-  PLANT_TECHNOLOGIES,
-  type PlantTechnology,
-  POWER_CATEGORIES,
-  type PowerCategory,
-  SPECIAL_FLAGS,
-  type SpecialFlag,
+  PI_RANGES,
+  type PiRange,
+  RP_RANGES,
+  type RpRange,
   VOLTAGE_LEVELS,
   type VoltageLevel,
+  VYROBNA_TYPES,
+  type VyrobnaType,
+  YES_NO_OPTIONS,
+  type YesNo,
 } from '../types';
 import type { AdminRole } from '../services/adminAuthService';
 
@@ -82,11 +84,14 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
   const [phaseFilter, setPhaseFilter] = useState<string>('ALL');
   const [showFilters, setShowFilters] = useState(false);
 
-  const [filterCategories, setFilterCategories] = useState<PowerCategory[]>([]);
+  const [filterCustomerTypes, setFilterCustomerTypes] = useState<CustomerType[]>([]);
   const [filterVoltages, setFilterVoltages] = useState<VoltageLevel[]>([]);
-  const [filterTechnologies, setFilterTechnologies] = useState<PlantTechnology[]>([]);
-  const [filterExportModes, setFilterExportModes] = useState<ExportMode[]>([]);
-  const [filterFlags, setFilterFlags] = useState<SpecialFlag[]>([]);
+  const [filterPiRanges, setFilterPiRanges] = useState<PiRange[]>([]);
+  const [filterRpRanges, setFilterRpRanges] = useState<RpRange[]>([]);
+  const [filterSvr, setFilterSvr] = useState<YesNo[]>([]);
+  const [filterZue, setFilterZue] = useState<YesNo[]>([]);
+  const [filterVyrobna, setFilterVyrobna] = useState<YesNo[]>([]);
+  const [filterVyrobnaTypes, setFilterVyrobnaTypes] = useState<VyrobnaType[]>([]);
 
   const [collapsedPhases, setCollapsedPhases] = useState<Record<string, boolean>>({});
   const [modalItem, setModalItem] = useState<ChecklistItemTemplate | null>(editingInitialItem);
@@ -115,11 +120,14 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
   }, [editingInitialItem, onClearInitialEdit]);
 
   const activeTagFilterCount =
-    filterCategories.length +
+    filterCustomerTypes.length +
     filterVoltages.length +
-    filterTechnologies.length +
-    filterExportModes.length +
-    filterFlags.length;
+    filterPiRanges.length +
+    filterRpRanges.length +
+    filterSvr.length +
+    filterZue.length +
+    filterVyrobna.length +
+    filterVyrobnaTypes.length;
 
   const hasActiveFilter = search.trim().length > 0 || activeTagFilterCount > 0;
 
@@ -127,11 +135,24 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
     arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val];
 
   const clearTagFilters = () => {
-    setFilterCategories([]);
+    setFilterCustomerTypes([]);
     setFilterVoltages([]);
-    setFilterTechnologies([]);
-    setFilterExportModes([]);
-    setFilterFlags([]);
+    setFilterPiRanges([]);
+    setFilterRpRanges([]);
+    setFilterSvr([]);
+    setFilterZue([]);
+    setFilterVyrobna([]);
+    setFilterVyrobnaTypes([]);
+  };
+
+  const handleToggleFilterVyrobna = (val: YesNo) => {
+    setFilterVyrobna((prev) => {
+      const next = toggleInArray(prev, val);
+      if (val === 'ANO' && !next.includes('ANO')) {
+        setFilterVyrobnaTypes([]);
+      }
+      return next;
+    });
   };
 
   const filteredItems = useMemo(() => {
@@ -142,9 +163,9 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
         if (q && !item.title.toLowerCase().includes(q)) return false;
 
         if (
-          filterCategories.length > 0 &&
-          item.categories.length > 0 &&
-          !item.categories.some((c) => filterCategories.includes(c))
+          filterCustomerTypes.length > 0 &&
+          item.customerTypes.length > 0 &&
+          !item.customerTypes.some((c) => filterCustomerTypes.includes(c))
         ) {
           return false;
         }
@@ -156,24 +177,50 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
           return false;
         }
         if (
-          filterTechnologies.length > 0 &&
-          item.technologies.length > 0 &&
-          !item.technologies.some((t) => filterTechnologies.includes(t))
+          filterPiRanges.length > 0 &&
+          item.piRanges.length > 0 &&
+          !item.piRanges.some((p) => filterPiRanges.includes(p))
         ) {
           return false;
         }
         if (
-          filterExportModes.length > 0 &&
-          item.exportModes.length > 0 &&
-          !item.exportModes.some((m) => filterExportModes.includes(m))
+          filterRpRanges.length > 0 &&
+          item.rpRanges.length > 0 &&
+          !item.rpRanges.some((r) => filterRpRanges.includes(r))
         ) {
           return false;
         }
         if (
-          filterFlags.length > 0 &&
-          !item.requiredFlags.some((f) => filterFlags.includes(f))
+          filterSvr.length > 0 &&
+          item.svrFilter.length > 0 &&
+          !item.svrFilter.some((s) => filterSvr.includes(s))
         ) {
           return false;
+        }
+        if (
+          filterZue.length > 0 &&
+          item.zueFilter.length > 0 &&
+          !item.zueFilter.some((z) => filterZue.includes(z))
+        ) {
+          return false;
+        }
+        if (
+          filterVyrobna.length > 0 &&
+          item.vyrobnaFilter.length > 0 &&
+          !item.vyrobnaFilter.some((v) => filterVyrobna.includes(v))
+        ) {
+          return false;
+        }
+        if (filterVyrobnaTypes.length > 0) {
+          if (item.vyrobnaFilter.length > 0 && !item.vyrobnaFilter.includes('ANO')) {
+            return false;
+          }
+          if (
+            item.vyrobnaTypes.length > 0 &&
+            !item.vyrobnaTypes.some((t) => filterVyrobnaTypes.includes(t))
+          ) {
+            return false;
+          }
         }
         return true;
       })
@@ -182,11 +229,14 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
     items,
     search,
     phaseFilter,
-    filterCategories,
+    filterCustomerTypes,
     filterVoltages,
-    filterTechnologies,
-    filterExportModes,
-    filterFlags,
+    filterPiRanges,
+    filterRpRanges,
+    filterSvr,
+    filterZue,
+    filterVyrobna,
+    filterVyrobnaTypes,
   ]);
 
   const visibleGroups = useMemo(() => {
@@ -223,11 +273,14 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
       reference: '',
       deadlineBadge: '',
       mandatory: true,
-      categories: [...filterCategories],
+      customerTypes: [...filterCustomerTypes],
       voltages: [...filterVoltages],
-      technologies: [...filterTechnologies],
-      exportModes: [...filterExportModes],
-      requiredFlags: [...filterFlags],
+      piRanges: [...filterPiRanges],
+      rpRanges: [...filterRpRanges],
+      svrFilter: [...filterSvr],
+      zueFilter: [...filterZue],
+      vyrobnaFilter: [...filterVyrobna],
+      vyrobnaTypes: [...filterVyrobnaTypes],
       createdBy: 'user',
       updatedAtIso: new Date().toISOString(),
     });
@@ -510,23 +563,23 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
       {showFilters && (
         <div className="surface-card filter-panel">
           <div className="filter-row">
-            <span className="filter-row-label">Kategorie</span>
+            <span className="filter-row-label">Typ odběratele</span>
             <div className="tag-picker">
-              {POWER_CATEGORIES.map((c) => (
+              {CUSTOMER_TYPES.map((ct) => (
                 <button
-                  key={c.id}
+                  key={ct.id}
                   type="button"
-                  className={`tag-chip ${filterCategories.includes(c.id) ? 'selected' : ''}`}
-                  onClick={() => setFilterCategories((prev) => toggleInArray(prev, c.id))}
+                  className={`tag-chip ${filterCustomerTypes.includes(ct.id) ? 'selected' : ''}`}
+                  onClick={() => setFilterCustomerTypes((prev) => toggleInArray(prev, ct.id))}
                 >
-                  {c.label}
+                  {ct.label}
                 </button>
               ))}
             </div>
           </div>
 
           <div className="filter-row">
-            <span className="filter-row-label">Napětí</span>
+            <span className="filter-row-label">Napěťová hladina</span>
             <div className="tag-picker">
               {VOLTAGE_LEVELS.map((v) => (
                 <button
@@ -542,52 +595,102 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
           </div>
 
           <div className="filter-row">
-            <span className="filter-row-label">Technologie</span>
+            <span className="filter-row-label">Pi</span>
             <div className="tag-picker">
-              {PLANT_TECHNOLOGIES.map((t) => (
+              {PI_RANGES.map((p) => (
                 <button
-                  key={t.id}
+                  key={p.id}
                   type="button"
-                  className={`tag-chip ${filterTechnologies.includes(t.id) ? 'selected' : ''}`}
-                  onClick={() => setFilterTechnologies((prev) => toggleInArray(prev, t.id))}
+                  className={`tag-chip ${filterPiRanges.includes(p.id) ? 'selected' : ''}`}
+                  onClick={() => setFilterPiRanges((prev) => toggleInArray(prev, p.id))}
                 >
-                  {t.label}
+                  {p.label}
                 </button>
               ))}
             </div>
           </div>
 
           <div className="filter-row">
-            <span className="filter-row-label">Přetoky</span>
+            <span className="filter-row-label">Rp</span>
             <div className="tag-picker">
-              {EXPORT_MODES.map((m) => (
+              {RP_RANGES.map((r) => (
                 <button
-                  key={m.id}
+                  key={r.id}
                   type="button"
-                  className={`tag-chip ${filterExportModes.includes(m.id) ? 'selected' : ''}`}
-                  onClick={() => setFilterExportModes((prev) => toggleInArray(prev, m.id))}
+                  className={`tag-chip ${filterRpRanges.includes(r.id) ? 'selected' : ''}`}
+                  onClick={() => setFilterRpRanges((prev) => toggleInArray(prev, r.id))}
                 >
-                  {m.label}
+                  {r.label}
                 </button>
               ))}
             </div>
           </div>
 
           <div className="filter-row">
-            <span className="filter-row-label">Příznaky</span>
+            <span className="filter-row-label">SVR</span>
             <div className="tag-picker">
-              {SPECIAL_FLAGS.map((f) => (
+              {YES_NO_OPTIONS.map((opt) => (
                 <button
-                  key={f.id}
+                  key={opt.id}
                   type="button"
-                  className={`tag-chip ${filterFlags.includes(f.id) ? 'selected' : ''}`}
-                  onClick={() => setFilterFlags((prev) => toggleInArray(prev, f.id))}
+                  className={`tag-chip ${filterSvr.includes(opt.id) ? 'selected' : ''}`}
+                  onClick={() => setFilterSvr((prev) => toggleInArray(prev, opt.id))}
                 >
-                  {f.label}
+                  {opt.label}
                 </button>
               ))}
             </div>
           </div>
+
+          <div className="filter-row">
+            <span className="filter-row-label">ZUE</span>
+            <div className="tag-picker">
+              {YES_NO_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  className={`tag-chip ${filterZue.includes(opt.id) ? 'selected' : ''}`}
+                  onClick={() => setFilterZue((prev) => toggleInArray(prev, opt.id))}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="filter-row">
+            <span className="filter-row-label">Výrobna</span>
+            <div className="tag-picker">
+              {YES_NO_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  className={`tag-chip ${filterVyrobna.includes(opt.id) ? 'selected' : ''}`}
+                  onClick={() => handleToggleFilterVyrobna(opt.id)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {(filterVyrobna.includes('ANO') || filterVyrobnaTypes.length > 0) && (
+            <div className="filter-row filter-row-sub">
+              <span className="filter-row-label">Typ výrobny</span>
+              <div className="tag-picker">
+                {VYROBNA_TYPES.map((vt) => (
+                  <button
+                    key={vt.id}
+                    type="button"
+                    className={`tag-chip ${filterVyrobnaTypes.includes(vt.id) ? 'selected' : ''}`}
+                    onClick={() => setFilterVyrobnaTypes((prev) => toggleInArray(prev, vt.id))}
+                  >
+                    {vt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -863,25 +966,28 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
 
               <div className="field-group">
                 <div className="field-label-row">
-                  <span className="field-label">Kategorie</span>
+                  <span className="field-label">Typ odběratele</span>
                   <span className="field-hint">prázdné = vše</span>
                 </div>
                 <div className="tag-picker">
-                  {POWER_CATEGORIES.map((c) => {
-                    const active = modalItem.categories.includes(c.id);
+                  {CUSTOMER_TYPES.map((ct) => {
+                    const active = modalItem.customerTypes.includes(ct.id);
                     return (
                       <button
-                        key={c.id}
+                        key={ct.id}
                         type="button"
                         className={`tag-chip ${active ? 'selected' : ''}`}
                         onClick={() =>
                           setModalItem({
                             ...modalItem,
-                            categories: toggleInArray<PowerCategory>(modalItem.categories, c.id),
+                            customerTypes: toggleInArray<CustomerType>(
+                              modalItem.customerTypes,
+                              ct.id
+                            ),
                           })
                         }
                       >
-                        {c.label}
+                        {ct.label}
                       </button>
                     );
                   })}
@@ -890,7 +996,7 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
 
               <div className="field-group">
                 <div className="field-label-row">
-                  <span className="field-label">Napětí</span>
+                  <span className="field-label">Napěťová hladina</span>
                   <span className="field-hint">prázdné = vše</span>
                 </div>
                 <div className="tag-picker">
@@ -917,28 +1023,25 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
 
               <div className="field-group">
                 <div className="field-label-row">
-                  <span className="field-label">Technologie</span>
+                  <span className="field-label">Pi</span>
                   <span className="field-hint">prázdné = vše</span>
                 </div>
                 <div className="tag-picker">
-                  {PLANT_TECHNOLOGIES.map((t) => {
-                    const active = modalItem.technologies.includes(t.id);
+                  {PI_RANGES.map((p) => {
+                    const active = modalItem.piRanges.includes(p.id);
                     return (
                       <button
-                        key={t.id}
+                        key={p.id}
                         type="button"
                         className={`tag-chip ${active ? 'selected' : ''}`}
                         onClick={() =>
                           setModalItem({
                             ...modalItem,
-                            technologies: toggleInArray<PlantTechnology>(
-                              modalItem.technologies,
-                              t.id
-                            ),
+                            piRanges: toggleInArray<PiRange>(modalItem.piRanges, p.id),
                           })
                         }
                       >
-                        {t.label}
+                        {p.label}
                       </button>
                     );
                   })}
@@ -947,25 +1050,25 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
 
               <div className="field-group">
                 <div className="field-label-row">
-                  <span className="field-label">Přetoky</span>
+                  <span className="field-label">Rp</span>
                   <span className="field-hint">prázdné = vše</span>
                 </div>
                 <div className="tag-picker">
-                  {EXPORT_MODES.map((m) => {
-                    const active = modalItem.exportModes.includes(m.id);
+                  {RP_RANGES.map((r) => {
+                    const active = modalItem.rpRanges.includes(r.id);
                     return (
                       <button
-                        key={m.id}
+                        key={r.id}
                         type="button"
                         className={`tag-chip ${active ? 'selected' : ''}`}
                         onClick={() =>
                           setModalItem({
                             ...modalItem,
-                            exportModes: toggleInArray<ExportMode>(modalItem.exportModes, m.id),
+                            rpRanges: toggleInArray<RpRange>(modalItem.rpRanges, r.id),
                           })
                         }
                       >
-                        {m.label}
+                        {r.label}
                       </button>
                     );
                   })}
@@ -974,33 +1077,121 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
 
               <div className="field-group">
                 <div className="field-label-row">
-                  <span className="field-label">Příznaky</span>
-                  <span className="field-hint">prázdné = vždy</span>
+                  <span className="field-label">SVR</span>
+                  <span className="field-hint">prázdné = vše</span>
                 </div>
                 <div className="tag-picker">
-                  {SPECIAL_FLAGS.map((f) => {
-                    const active = modalItem.requiredFlags.includes(f.id);
+                  {YES_NO_OPTIONS.map((opt) => {
+                    const active = modalItem.svrFilter.includes(opt.id);
                     return (
                       <button
-                        key={f.id}
+                        key={opt.id}
                         type="button"
                         className={`tag-chip ${active ? 'selected' : ''}`}
                         onClick={() =>
                           setModalItem({
                             ...modalItem,
-                            requiredFlags: toggleInArray<SpecialFlag>(
-                              modalItem.requiredFlags,
-                              f.id
-                            ),
+                            svrFilter: toggleInArray<YesNo>(modalItem.svrFilter, opt.id),
                           })
                         }
                       >
-                        {f.label}
+                        {opt.label}
                       </button>
                     );
                   })}
                 </div>
               </div>
+
+              <div className="field-group">
+                <div className="field-label-row">
+                  <span className="field-label">ZUE</span>
+                  <span className="field-hint">prázdné = vše</span>
+                </div>
+                <div className="tag-picker">
+                  {YES_NO_OPTIONS.map((opt) => {
+                    const active = modalItem.zueFilter.includes(opt.id);
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        className={`tag-chip ${active ? 'selected' : ''}`}
+                        onClick={() =>
+                          setModalItem({
+                            ...modalItem,
+                            zueFilter: toggleInArray<YesNo>(modalItem.zueFilter, opt.id),
+                          })
+                        }
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="field-group">
+                <div className="field-label-row">
+                  <span className="field-label">Výrobna</span>
+                  <span className="field-hint">prázdné = vše</span>
+                </div>
+                <div className="tag-picker">
+                  {YES_NO_OPTIONS.map((opt) => {
+                    const active = modalItem.vyrobnaFilter.includes(opt.id);
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        className={`tag-chip ${active ? 'selected' : ''}`}
+                        onClick={() => {
+                          const nextVyrobna = toggleInArray<YesNo>(modalItem.vyrobnaFilter, opt.id);
+                          setModalItem({
+                            ...modalItem,
+                            vyrobnaFilter: nextVyrobna,
+                            vyrobnaTypes:
+                              opt.id === 'ANO' && !nextVyrobna.includes('ANO')
+                                ? []
+                                : modalItem.vyrobnaTypes,
+                          });
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {(modalItem.vyrobnaFilter.includes('ANO') || modalItem.vyrobnaTypes.length > 0) && (
+                <div className="field-group vyrobna-subpanel">
+                  <div className="field-label-row">
+                    <span className="field-label">Typ výrobny</span>
+                    <span className="field-hint">prázdné = vše</span>
+                  </div>
+                  <div className="tag-picker">
+                    {VYROBNA_TYPES.map((vt) => {
+                      const active = modalItem.vyrobnaTypes.includes(vt.id);
+                      return (
+                        <button
+                          key={vt.id}
+                          type="button"
+                          className={`tag-chip ${active ? 'selected' : ''}`}
+                          onClick={() =>
+                            setModalItem({
+                              ...modalItem,
+                              vyrobnaTypes: toggleInArray<VyrobnaType>(
+                                modalItem.vyrobnaTypes,
+                                vt.id
+                              ),
+                            })
+                          }
+                        >
+                          {vt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="modal-footer">

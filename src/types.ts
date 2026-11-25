@@ -1,10 +1,15 @@
-export type PowerCategory = 'MIKROZDROJ' | 'A1' | 'A2' | 'B1' | 'B2' | 'C_D';
-export type VoltageLevel = 'NN' | 'VN' | 'VVN';
-export type PlantTechnology = 'FVE' | 'FVE_BESS' | 'BESS' | 'KGJ' | 'MVE' | 'VTE';
-export type ExportMode =
-  | 'STANDARD_PRETOKY'
-  | 'MIKROZDROJ_BEZ_PRETOKU'
-  | 'NULOVY_REZERVOVANY_VYKON';
+export type CustomerType = 'LDS' | 'ODBERATEL';
+export type VoltageLevel = 'NN' | 'VN';
+export type PiRange = 'DO_100' | 'NAD_100' | 'NAD_400' | 'NAD_1000';
+export type RpRange = 'NAD_100' | 'NAD_1000';
+export type YesNo = 'ANO' | 'NE';
+export type VyrobnaType =
+  | 'FVE'
+  | 'ZUE'
+  | 'FVE_ZUE_SPOLECNY'
+  | 'FVE_ZUE_SAMOSTATNE'
+  | 'KGJ_SYNCHRONNI'
+  | 'KGJ_NESYNCHRONNI';
 
 export type BuiltInPhaseId =
   | 'FAZE_1_PRIPRAVA'
@@ -30,20 +35,15 @@ export interface PhaseGroup {
   title: string;
 }
 
-export type SpecialFlag =
-  | 'CIZI_NEMOVITOST'
-  | 'PLNA_MOC'
-  | 'OSTROVNI_PROVOZ'
-  | 'NAD_50_KW_LICENCE'
-  | 'NEPRIME_MERENI';
-
 export interface PlantConfig {
-  installedPowerKw: number;
-  category: PowerCategory;
+  customerType: CustomerType;
   voltage: VoltageLevel;
-  technology: PlantTechnology;
-  exportMode: ExportMode;
-  flags: SpecialFlag[];
+  pi: PiRange;
+  rp: RpRange | null;
+  svr: boolean;
+  zue: boolean;
+  vyrobna: boolean;
+  vyrobnaType: VyrobnaType | null;
 }
 
 export interface ChecklistItemTemplate {
@@ -55,11 +55,14 @@ export interface ChecklistItemTemplate {
   reference: string;
   deadlineBadge: string;
   mandatory: boolean;
-  categories: PowerCategory[];
+  customerTypes: CustomerType[];
   voltages: VoltageLevel[];
-  technologies: PlantTechnology[];
-  exportModes: ExportMode[];
-  requiredFlags: SpecialFlag[];
+  piRanges: PiRange[];
+  rpRanges: RpRange[];
+  svrFilter: YesNo[];
+  zueFilter: YesNo[];
+  vyrobnaFilter: YesNo[];
+  vyrobnaTypes: VyrobnaType[];
   createdBy: string;
   updatedAtIso: string;
 }
@@ -69,12 +72,14 @@ export interface SavedProject {
   name: string;
   contractNumber: string;
   eanCode: string;
-  installedPowerKw: number;
-  category: PowerCategory;
+  customerType: CustomerType;
   voltage: VoltageLevel;
-  technology: PlantTechnology;
-  exportMode: ExportMode;
-  flags: SpecialFlag[];
+  pi: PiRange;
+  rp: RpRange | null;
+  svr: boolean;
+  zue: boolean;
+  vyrobna: boolean;
+  vyrobnaType: VyrobnaType | null;
   checkedIds: string[];
   itemNotes: Record<string, string>;
   createdBy: string;
@@ -105,48 +110,12 @@ export const FEEDBACK_CATEGORIES: {
   { id: 'JINE', label: 'Obecná zpráva', shortLabel: 'Ostatní' },
 ];
 
-export const POWER_CATEGORIES: {
-  id: PowerCategory;
+export const CUSTOMER_TYPES: {
+  id: CustomerType;
   label: string;
-  rangeLabel: string;
-  rfgDoc: string;
 }[] = [
-  {
-    id: 'MIKROZDROJ',
-    label: 'Mikrozdroj',
-    rangeLabel: '≤ 10,8 kW (NN)',
-    rfgDoc: 'VM A1',
-  },
-  {
-    id: 'A1',
-    label: 'A1',
-    rangeLabel: '≤ 11 kW',
-    rfgDoc: 'VM A1',
-  },
-  {
-    id: 'A2',
-    label: 'A2',
-    rangeLabel: '11–100 kW',
-    rfgDoc: 'VM A2',
-  },
-  {
-    id: 'B1',
-    label: 'B1',
-    rangeLabel: '100 kW – 1 MW',
-    rfgDoc: 'VM B1 + UPOS',
-  },
-  {
-    id: 'B2',
-    label: 'B2',
-    rangeLabel: '1–30 MW',
-    rfgDoc: 'VM B2 + UPOS',
-  },
-  {
-    id: 'C_D',
-    label: 'C / D',
-    rangeLabel: '≥ 30 MW / 110 kV',
-    rfgDoc: 'VM C/D + UPOS',
-  },
+  { id: 'LDS', label: 'LDS' },
+  { id: 'ODBERATEL', label: 'Odběratel' },
 ];
 
 export const VOLTAGE_LEVELS: {
@@ -156,42 +125,45 @@ export const VOLTAGE_LEVELS: {
 }[] = [
   { id: 'NN', label: 'NN', sub: '0,4 kV' },
   { id: 'VN', label: 'VN', sub: '22 / 35 kV' },
-  { id: 'VVN', label: 'VVN', sub: '110 kV' },
 ];
 
-export const PLANT_TECHNOLOGIES: {
-  id: PlantTechnology;
+export const PI_RANGES: {
+  id: PiRange;
   label: string;
-  sub: string;
 }[] = [
-  { id: 'FVE', label: 'FVE', sub: 'Fotovoltaika' },
-  { id: 'FVE_BESS', label: 'FVE + BESS', sub: 'Hybridní s baterií' },
-  { id: 'BESS', label: 'BESS', sub: 'Bateriové úložiště' },
-  { id: 'KGJ', label: 'KGJ / Bioplyn', sub: 'Kogenerace' },
-  { id: 'MVE', label: 'MVE', sub: 'Malá vodní' },
-  { id: 'VTE', label: 'VTE', sub: 'Větrná' },
+  { id: 'DO_100', label: 'do 100 kW' },
+  { id: 'NAD_100', label: 'nad 100 kW' },
+  { id: 'NAD_400', label: 'nad 400 kW' },
+  { id: 'NAD_1000', label: 'nad 1000 kW' },
 ];
 
-export const EXPORT_MODES: {
-  id: ExportMode;
+export const RP_RANGES: {
+  id: RpRange;
   label: string;
-  sub: string;
 }[] = [
-  {
-    id: 'STANDARD_PRETOKY',
-    label: 'S přetoky (Pr > 0 kW)',
-    sub: 'Standardní připojení s dodávkou do DS',
-  },
-  {
-    id: 'MIKROZDROJ_BEZ_PRETOKU',
-    label: 'Mikrozdroj bez přetoků (§ 16)',
-    sub: 'Do 10,8 kW na NN, Pr = 0 kW',
-  },
-  {
-    id: 'NULOVY_REZERVOVANY_VYKON',
-    label: 'Bez přetoků (Pr = 0 kW)',
-    sub: 'Standardní připojení s nulovým Pr',
-  },
+  { id: 'NAD_100', label: 'nad 100 kW' },
+  { id: 'NAD_1000', label: 'nad 1000 kW' },
+];
+
+export const YES_NO_OPTIONS: {
+  id: YesNo;
+  label: string;
+}[] = [
+  { id: 'ANO', label: 'Ano' },
+  { id: 'NE', label: 'Ne' },
+];
+
+export const VYROBNA_TYPES: {
+  id: VyrobnaType;
+  label: string;
+  group: 'FVE' | 'ZUE' | 'FVE_ZUE' | 'KGJ';
+}[] = [
+  { id: 'FVE', label: 'FVE', group: 'FVE' },
+  { id: 'ZUE', label: 'ZUE', group: 'ZUE' },
+  { id: 'FVE_ZUE_SPOLECNY', label: 'FVE + ZUE · společný střídač', group: 'FVE_ZUE' },
+  { id: 'FVE_ZUE_SAMOSTATNE', label: 'FVE + ZUE · samostatně', group: 'FVE_ZUE' },
+  { id: 'KGJ_SYNCHRONNI', label: 'KGJ / bioplyn / diesel · synchronní', group: 'KGJ' },
+  { id: 'KGJ_NESYNCHRONNI', label: 'KGJ / bioplyn / diesel · nesynchronní', group: 'KGJ' },
 ];
 
 export const PHASES: {
@@ -238,116 +210,40 @@ export const PHASES: {
   },
 ];
 
-export const SPECIAL_FLAGS: {
-  id: SpecialFlag;
-  label: string;
-  hint: string;
-}[] = [
-  {
-    id: 'CIZI_NEMOVITOST',
-    label: 'Cizí pozemek / budova',
-    hint: 'Souhlas vlastníka nemovitosti',
-  },
-  {
-    id: 'PLNA_MOC',
-    label: 'Zastoupení na plnou moc',
-    hint: 'Plná moc pro ČEZ Distribuce',
-  },
-  {
-    id: 'OSTROVNI_PROVOZ',
-    label: 'Ostrovní provoz (backup)',
-    hint: 'Vazební spínač a ochrany TN-S',
-  },
-  {
-    id: 'NAD_50_KW_LICENCE',
-    label: 'Nad 50 kW (licence ERÚ)',
-    hint: 'Automaticky při Pi > 50 kW',
-  },
-  {
-    id: 'NEPRIME_MERENI',
-    label: 'Nepřímé měření (MTP / MTN)',
-    hint: 'Nad 80 A nebo VN/VVN',
-  },
-];
-
-export function inferCategoryAndDefaults(
-  powerKw: number,
-  prev: PlantConfig
-): PlantConfig {
-  const safePower = Number.isFinite(powerKw) && powerKw >= 0 ? powerKw : 0;
-  let category: PowerCategory = 'MIKROZDROJ';
-  let voltage: VoltageLevel = prev.voltage;
-  let exportMode: ExportMode = prev.exportMode;
-  const flags = new Set<SpecialFlag>(prev.flags);
-
-  if (safePower <= 10.8) {
-    category = prev.exportMode === 'MIKROZDROJ_BEZ_PRETOKU' ? 'MIKROZDROJ' : 'MIKROZDROJ';
-    voltage = 'NN';
-  } else if (safePower <= 11) {
-    category = 'A1';
-    voltage = 'NN';
-  } else if (safePower < 100) {
-    category = 'A2';
-    if (voltage === 'VVN') voltage = 'NN';
-  } else if (safePower < 1000) {
-    category = 'B1';
-    if (safePower >= 150 && voltage === 'NN') {
-      voltage = 'VN';
-    }
-  } else if (safePower < 30000) {
-    category = 'B2';
-    if (voltage === 'NN') voltage = 'VN';
-  } else {
-    category = 'C_D';
-    voltage = 'VVN';
-  }
-
-  // Simplified § 16 microsource is strictly ≤ 10.8 kW on NN
-  if ((safePower > 10.8 || voltage !== 'NN') && exportMode === 'MIKROZDROJ_BEZ_PRETOKU') {
-    exportMode = 'STANDARD_PRETOKY';
-  }
-
-  if (safePower > 50) {
-    flags.add('NAD_50_KW_LICENCE');
-  } else {
-    flags.delete('NAD_50_KW_LICENCE');
-  }
-
-  if (voltage !== 'NN' || safePower >= 55) {
-    flags.add('NEPRIME_MERENI');
-  } else if (safePower < 50 && voltage === 'NN') {
-    flags.delete('NEPRIME_MERENI');
-  }
-
-  return {
-    ...prev,
-    installedPowerKw: safePower,
-    category,
-    voltage,
-    exportMode,
-    flags: Array.from(flags),
-  };
-}
-
 export function matchesPlantConfig(
   item: ChecklistItemTemplate,
   config: PlantConfig
 ): boolean {
-  if (item.categories.length > 0 && !item.categories.includes(config.category)) {
+  if (item.customerTypes.length > 0 && !item.customerTypes.includes(config.customerType)) {
     return false;
   }
   if (item.voltages.length > 0 && !item.voltages.includes(config.voltage)) {
     return false;
   }
-  if (item.technologies.length > 0 && !item.technologies.includes(config.technology)) {
+  if (item.piRanges.length > 0 && !item.piRanges.includes(config.pi)) {
     return false;
   }
-  if (item.exportModes.length > 0 && !item.exportModes.includes(config.exportMode)) {
+  if (item.rpRanges.length > 0) {
+    if (!config.rp || !item.rpRanges.includes(config.rp)) {
+      return false;
+    }
+  }
+  if (item.svrFilter.length > 0 && !item.svrFilter.includes(config.svr ? 'ANO' : 'NE')) {
     return false;
   }
-  if (item.requiredFlags.length > 0) {
-    const hasMatchingFlag = item.requiredFlags.some((f) => config.flags.includes(f));
-    if (!hasMatchingFlag) return false;
+  if (item.zueFilter.length > 0 && !item.zueFilter.includes(config.zue ? 'ANO' : 'NE')) {
+    return false;
+  }
+  if (
+    item.vyrobnaFilter.length > 0 &&
+    !item.vyrobnaFilter.includes(config.vyrobna ? 'ANO' : 'NE')
+  ) {
+    return false;
+  }
+  if (item.vyrobnaTypes.length > 0) {
+    if (!config.vyrobna || !config.vyrobnaType || !item.vyrobnaTypes.includes(config.vyrobnaType)) {
+      return false;
+    }
   }
   return true;
 }

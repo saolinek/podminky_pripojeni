@@ -54,12 +54,14 @@ type ActiveTab = 'CHECKLIST' | 'DATABASE' | 'FEEDBACK';
 type LoginIntent = 'DATABASE' | 'FEEDBACK';
 
 const DEFAULT_CONFIG: PlantConfig = {
-  installedPowerKw: 9.9,
-  category: 'MIKROZDROJ',
+  customerType: 'ODBERATEL',
   voltage: 'NN',
-  technology: 'FVE_BESS',
-  exportMode: 'STANDARD_PRETOKY',
-  flags: [],
+  pi: 'DO_100',
+  rp: null,
+  svr: false,
+  zue: false,
+  vyrobna: false,
+  vyrobnaType: null,
 };
 
 export function App() {
