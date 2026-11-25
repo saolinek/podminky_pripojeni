@@ -1,6 +1,7 @@
 export type CustomerType = 'LDS' | 'ODBERATEL';
 export type VoltageLevel = 'NN' | 'VN';
 export type PiRange = 'DO_100' | 'NAD_100' | 'NAD_400' | 'NAD_1000';
+export type RvRange = 'DO_1MW' | 'NAD_1MW';
 export type RpRange = 'NAD_100' | 'NAD_1000';
 export type YesNo = 'ANO' | 'NE';
 export type VyrobnaType =
@@ -38,12 +39,13 @@ export interface PhaseGroup {
 export interface PlantConfig {
   customerType: CustomerType;
   voltage: VoltageLevel;
-  pi: PiRange;
   rp: RpRange | null;
   svr: boolean;
   zue: boolean;
   vyrobna: boolean;
   vyrobnaType: VyrobnaType | null;
+  pi: PiRange | null;
+  rv: RvRange | null;
 }
 
 export interface ChecklistItemTemplate {
@@ -58,6 +60,7 @@ export interface ChecklistItemTemplate {
   customerTypes: CustomerType[];
   voltages: VoltageLevel[];
   piRanges: PiRange[];
+  rvRanges: RvRange[];
   rpRanges: RpRange[];
   svrFilter: YesNo[];
   zueFilter: YesNo[];
@@ -74,7 +77,8 @@ export interface SavedProject {
   eanCode: string;
   customerType: CustomerType;
   voltage: VoltageLevel;
-  pi: PiRange;
+  pi: PiRange | null;
+  rv: RvRange | null;
   rp: RpRange | null;
   svr: boolean;
   zue: boolean;
@@ -135,6 +139,14 @@ export const PI_RANGES: {
   { id: 'NAD_100', label: 'nad 100 kW' },
   { id: 'NAD_400', label: 'nad 400 kW' },
   { id: 'NAD_1000', label: 'nad 1000 kW' },
+];
+
+export const RV_RANGES: {
+  id: RvRange;
+  label: string;
+}[] = [
+  { id: 'DO_1MW', label: 'do 1 MW' },
+  { id: 'NAD_1MW', label: 'nad 1 MW' },
 ];
 
 export const RP_RANGES: {
@@ -220,9 +232,6 @@ export function matchesPlantConfig(
   if (item.voltages.length > 0 && !item.voltages.includes(config.voltage)) {
     return false;
   }
-  if (item.piRanges.length > 0 && !item.piRanges.includes(config.pi)) {
-    return false;
-  }
   if (item.rpRanges.length > 0) {
     if (!config.rp || !item.rpRanges.includes(config.rp)) {
       return false;
@@ -242,6 +251,16 @@ export function matchesPlantConfig(
   }
   if (item.vyrobnaTypes.length > 0) {
     if (!config.vyrobna || !config.vyrobnaType || !item.vyrobnaTypes.includes(config.vyrobnaType)) {
+      return false;
+    }
+  }
+  if (item.piRanges.length > 0) {
+    if (!config.vyrobna || !config.pi || !item.piRanges.includes(config.pi)) {
+      return false;
+    }
+  }
+  if (item.rvRanges.length > 0) {
+    if (!config.vyrobna || !config.rv || !item.rvRanges.includes(config.rv)) {
       return false;
     }
   }

@@ -8,6 +8,8 @@ import {
   type PlantConfig,
   RP_RANGES,
   type RpRange,
+  RV_RANGES,
+  type RvRange,
   VOLTAGE_LEVELS,
   type VoltageLevel,
   type VyrobnaType,
@@ -45,12 +47,16 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
     onChange({ ...config, voltage });
   };
 
-  const handlePiChange = (pi: PiRange) => {
-    onChange({ ...config, pi });
-  };
-
   const handleRpToggle = (rp: RpRange) => {
     onChange({ ...config, rp: config.rp === rp ? null : rp });
+  };
+
+  const handlePiToggle = (pi: PiRange) => {
+    onChange({ ...config, pi: config.pi === pi ? null : pi });
+  };
+
+  const handleRvToggle = (rv: RvRange) => {
+    onChange({ ...config, rv: config.rv === rv ? null : rv });
   };
 
   const handleVyrobnaToggle = (vyrobna: boolean) => {
@@ -58,6 +64,8 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
       ...config,
       vyrobna,
       vyrobnaType: vyrobna ? config.vyrobnaType : null,
+      pi: vyrobna ? config.pi : null,
+      rv: vyrobna ? config.rv : null,
     });
   };
 
@@ -130,27 +138,7 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
         </div>
 
         <div className="field-group">
-          <span className="field-label">Pi</span>
-          <div className="choice-grid-2">
-            {PI_RANGES.map((p) => (
-              <button
-                key={p.id}
-                id={`pi-btn-${p.id}`}
-                type="button"
-                className={`choice-btn ${config.pi === p.id ? 'selected' : ''}`}
-                onClick={() => handlePiChange(p.id)}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="field-group">
-          <div className="field-label-row">
-            <span className="field-label">Rp</span>
-            <span className="field-hint">nepovinné</span>
-          </div>
+          <span className="field-label">Rp</span>
           <div className="choice-grid-2">
             {RP_RANGES.map((r) => (
               <button
@@ -324,6 +312,40 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
                   </div>
                 </div>
               )}
+
+              <div className="vyrobna-subtype-wrap">
+                <span className="field-label">Pi</span>
+                <div className="choice-grid-2">
+                  {PI_RANGES.map((p) => (
+                    <button
+                      key={p.id}
+                      id={`pi-btn-${p.id}`}
+                      type="button"
+                      className={`choice-btn ${config.pi === p.id ? 'selected' : ''}`}
+                      onClick={() => handlePiToggle(p.id)}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="vyrobna-subtype-wrap">
+                <span className="field-label">Rv</span>
+                <div className="choice-grid-2">
+                  {RV_RANGES.map((r) => (
+                    <button
+                      key={r.id}
+                      id={`rv-btn-${r.id}`}
+                      type="button"
+                      className={`choice-btn ${config.rv === r.id ? 'selected' : ''}`}
+                      onClick={() => handleRvToggle(r.id)}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>

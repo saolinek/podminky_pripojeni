@@ -1178,9 +1178,13 @@ h3 {
   gap: 0.65rem;
 }
 
-.filter-row-sub {
-  padding: 0.55rem 0.7rem;
+.filter-subpanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.65rem 0.75rem;
   background: var(--bg);
+  border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
   border-radius: var(--r-sm);
 }

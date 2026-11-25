@@ -92,6 +92,7 @@ export const SavedProjectsView: React.FC<SavedProjectsViewProps> = ({
                 customerType: proj.customerType,
                 voltage: proj.voltage,
                 pi: proj.pi,
+                rv: proj.rv,
                 rp: proj.rp,
                 svr: proj.svr,
                 zue: proj.zue,
@@ -106,7 +107,7 @@ export const SavedProjectsView: React.FC<SavedProjectsViewProps> = ({
 
             const customerLabel =
               CUSTOMER_TYPES.find((c) => c.id === proj.customerType)?.label || proj.customerType;
-            const piLabel = PI_RANGES.find((p) => p.id === proj.pi)?.label || proj.pi;
+            const piLabel = proj.pi ? PI_RANGES.find((p) => p.id === proj.pi)?.label || proj.pi : null;
             const vyrobnaLabel = proj.vyrobnaType
               ? VYROBNA_TYPES.find((t) => t.id === proj.vyrobnaType)?.label || proj.vyrobnaType
               : null;
@@ -142,7 +143,7 @@ export const SavedProjectsView: React.FC<SavedProjectsViewProps> = ({
                   <div className="spec-pills">
                     <span className="spec-pill highlight">{customerLabel}</span>
                     <span className="spec-pill">{proj.voltage}</span>
-                    <span className="spec-pill">Pi {piLabel}</span>
+                    {piLabel && <span className="spec-pill">Pi {piLabel}</span>}
                     {vyrobnaLabel && <span className="spec-pill">{vyrobnaLabel}</span>}
                     {proj.contractNumber && (
                       <span className="spec-pill">SoP {proj.contractNumber}</span>

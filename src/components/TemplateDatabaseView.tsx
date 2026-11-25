@@ -24,6 +24,8 @@ import {
   type PiRange,
   RP_RANGES,
   type RpRange,
+  RV_RANGES,
+  type RvRange,
   VOLTAGE_LEVELS,
   type VoltageLevel,
   VYROBNA_TYPES,
@@ -87,6 +89,7 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
   const [filterCustomerTypes, setFilterCustomerTypes] = useState<CustomerType[]>([]);
   const [filterVoltages, setFilterVoltages] = useState<VoltageLevel[]>([]);
   const [filterPiRanges, setFilterPiRanges] = useState<PiRange[]>([]);
+  const [filterRvRanges, setFilterRvRanges] = useState<RvRange[]>([]);
   const [filterRpRanges, setFilterRpRanges] = useState<RpRange[]>([]);
   const [filterSvr, setFilterSvr] = useState<YesNo[]>([]);
   const [filterZue, setFilterZue] = useState<YesNo[]>([]);
@@ -123,6 +126,7 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
     filterCustomerTypes.length +
     filterVoltages.length +
     filterPiRanges.length +
+    filterRvRanges.length +
     filterRpRanges.length +
     filterSvr.length +
     filterZue.length +
@@ -138,6 +142,7 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
     setFilterCustomerTypes([]);
     setFilterVoltages([]);
     setFilterPiRanges([]);
+    setFilterRvRanges([]);
     setFilterRpRanges([]);
     setFilterSvr([]);
     setFilterZue([]);
@@ -150,6 +155,8 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
       const next = toggleInArray(prev, val);
       if (val === 'ANO' && !next.includes('ANO')) {
         setFilterVyrobnaTypes([]);
+        setFilterPiRanges([]);
+        setFilterRvRanges([]);
       }
       return next;
     });
@@ -176,12 +183,27 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
         ) {
           return false;
         }
-        if (
-          filterPiRanges.length > 0 &&
-          item.piRanges.length > 0 &&
-          !item.piRanges.some((p) => filterPiRanges.includes(p))
-        ) {
-          return false;
+        if (filterPiRanges.length > 0) {
+          if (item.vyrobnaFilter.length > 0 && !item.vyrobnaFilter.includes('ANO')) {
+            return false;
+          }
+          if (
+            item.piRanges.length > 0 &&
+            !item.piRanges.some((p) => filterPiRanges.includes(p))
+          ) {
+            return false;
+          }
+        }
+        if (filterRvRanges.length > 0) {
+          if (item.vyrobnaFilter.length > 0 && !item.vyrobnaFilter.includes('ANO')) {
+            return false;
+          }
+          if (
+            item.rvRanges.length > 0 &&
+            !item.rvRanges.some((r) => filterRvRanges.includes(r))
+          ) {
+            return false;
+          }
         }
         if (
           filterRpRanges.length > 0 &&
@@ -232,6 +254,7 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
     filterCustomerTypes,
     filterVoltages,
     filterPiRanges,
+    filterRvRanges,
     filterRpRanges,
     filterSvr,
     filterZue,
@@ -276,6 +299,7 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
       customerTypes: [...filterCustomerTypes],
       voltages: [...filterVoltages],
       piRanges: [...filterPiRanges],
+      rvRanges: [...filterRvRanges],
       rpRanges: [...filterRpRanges],
       svrFilter: [...filterSvr],
       zueFilter: [...filterZue],
@@ -595,22 +619,6 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
           </div>
 
           <div className="filter-row">
-            <span className="filter-row-label">Pi</span>
-            <div className="tag-picker">
-              {PI_RANGES.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={`tag-chip ${filterPiRanges.includes(p.id) ? 'selected' : ''}`}
-                  onClick={() => setFilterPiRanges((prev) => toggleInArray(prev, p.id))}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="filter-row">
             <span className="filter-row-label">Rp</span>
             <div className="tag-picker">
               {RP_RANGES.map((r) => (
@@ -674,20 +682,57 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
             </div>
           </div>
 
-          {(filterVyrobna.includes('ANO') || filterVyrobnaTypes.length > 0) && (
-            <div className="filter-row filter-row-sub">
-              <span className="filter-row-label">Typ výrobny</span>
-              <div className="tag-picker">
-                {VYROBNA_TYPES.map((vt) => (
-                  <button
-                    key={vt.id}
-                    type="button"
-                    className={`tag-chip ${filterVyrobnaTypes.includes(vt.id) ? 'selected' : ''}`}
-                    onClick={() => setFilterVyrobnaTypes((prev) => toggleInArray(prev, vt.id))}
-                  >
-                    {vt.label}
-                  </button>
-                ))}
+          {(filterVyrobna.includes('ANO') ||
+            filterVyrobnaTypes.length > 0 ||
+            filterPiRanges.length > 0 ||
+            filterRvRanges.length > 0) && (
+            <div className="filter-subpanel">
+              <div className="filter-row">
+                <span className="filter-row-label">Typ výrobny</span>
+                <div className="tag-picker">
+                  {VYROBNA_TYPES.map((vt) => (
+                    <button
+                      key={vt.id}
+                      type="button"
+                      className={`tag-chip ${filterVyrobnaTypes.includes(vt.id) ? 'selected' : ''}`}
+                      onClick={() => setFilterVyrobnaTypes((prev) => toggleInArray(prev, vt.id))}
+                    >
+                      {vt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="filter-row">
+                <span className="filter-row-label">Pi</span>
+                <div className="tag-picker">
+                  {PI_RANGES.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`tag-chip ${filterPiRanges.includes(p.id) ? 'selected' : ''}`}
+                      onClick={() => setFilterPiRanges((prev) => toggleInArray(prev, p.id))}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="filter-row">
+                <span className="filter-row-label">Rv</span>
+                <div className="tag-picker">
+                  {RV_RANGES.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      className={`tag-chip ${filterRvRanges.includes(r.id) ? 'selected' : ''}`}
+                      onClick={() => setFilterRvRanges((prev) => toggleInArray(prev, r.id))}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -1023,33 +1068,6 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
 
               <div className="field-group">
                 <div className="field-label-row">
-                  <span className="field-label">Pi</span>
-                  <span className="field-hint">prázdné = vše</span>
-                </div>
-                <div className="tag-picker">
-                  {PI_RANGES.map((p) => {
-                    const active = modalItem.piRanges.includes(p.id);
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        className={`tag-chip ${active ? 'selected' : ''}`}
-                        onClick={() =>
-                          setModalItem({
-                            ...modalItem,
-                            piRanges: toggleInArray<PiRange>(modalItem.piRanges, p.id),
-                          })
-                        }
-                      >
-                        {p.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="field-group">
-                <div className="field-label-row">
                   <span className="field-label">Rp</span>
                   <span className="field-hint">prázdné = vše</span>
                 </div>
@@ -1144,13 +1162,13 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
                         className={`tag-chip ${active ? 'selected' : ''}`}
                         onClick={() => {
                           const nextVyrobna = toggleInArray<YesNo>(modalItem.vyrobnaFilter, opt.id);
+                          const cleared = opt.id === 'ANO' && !nextVyrobna.includes('ANO');
                           setModalItem({
                             ...modalItem,
                             vyrobnaFilter: nextVyrobna,
-                            vyrobnaTypes:
-                              opt.id === 'ANO' && !nextVyrobna.includes('ANO')
-                                ? []
-                                : modalItem.vyrobnaTypes,
+                            vyrobnaTypes: cleared ? [] : modalItem.vyrobnaTypes,
+                            piRanges: cleared ? [] : modalItem.piRanges,
+                            rvRanges: cleared ? [] : modalItem.rvRanges,
                           });
                         }}
                       >
@@ -1161,34 +1179,93 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
                 </div>
               </div>
 
-              {(modalItem.vyrobnaFilter.includes('ANO') || modalItem.vyrobnaTypes.length > 0) && (
+              {(modalItem.vyrobnaFilter.includes('ANO') ||
+                modalItem.vyrobnaTypes.length > 0 ||
+                modalItem.piRanges.length > 0 ||
+                modalItem.rvRanges.length > 0) && (
                 <div className="field-group vyrobna-subpanel">
-                  <div className="field-label-row">
-                    <span className="field-label">Typ výrobny</span>
-                    <span className="field-hint">prázdné = vše</span>
+                  <div className="field-group">
+                    <div className="field-label-row">
+                      <span className="field-label">Typ výrobny</span>
+                      <span className="field-hint">prázdné = vše</span>
+                    </div>
+                    <div className="tag-picker">
+                      {VYROBNA_TYPES.map((vt) => {
+                        const active = modalItem.vyrobnaTypes.includes(vt.id);
+                        return (
+                          <button
+                            key={vt.id}
+                            type="button"
+                            className={`tag-chip ${active ? 'selected' : ''}`}
+                            onClick={() =>
+                              setModalItem({
+                                ...modalItem,
+                                vyrobnaTypes: toggleInArray<VyrobnaType>(
+                                  modalItem.vyrobnaTypes,
+                                  vt.id
+                                ),
+                              })
+                            }
+                          >
+                            {vt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="tag-picker">
-                    {VYROBNA_TYPES.map((vt) => {
-                      const active = modalItem.vyrobnaTypes.includes(vt.id);
-                      return (
-                        <button
-                          key={vt.id}
-                          type="button"
-                          className={`tag-chip ${active ? 'selected' : ''}`}
-                          onClick={() =>
-                            setModalItem({
-                              ...modalItem,
-                              vyrobnaTypes: toggleInArray<VyrobnaType>(
-                                modalItem.vyrobnaTypes,
-                                vt.id
-                              ),
-                            })
-                          }
-                        >
-                          {vt.label}
-                        </button>
-                      );
-                    })}
+
+                  <div className="field-group">
+                    <div className="field-label-row">
+                      <span className="field-label">Pi</span>
+                      <span className="field-hint">prázdné = vše</span>
+                    </div>
+                    <div className="tag-picker">
+                      {PI_RANGES.map((p) => {
+                        const active = modalItem.piRanges.includes(p.id);
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            className={`tag-chip ${active ? 'selected' : ''}`}
+                            onClick={() =>
+                              setModalItem({
+                                ...modalItem,
+                                piRanges: toggleInArray<PiRange>(modalItem.piRanges, p.id),
+                              })
+                            }
+                          >
+                            {p.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="field-group">
+                    <div className="field-label-row">
+                      <span className="field-label">Rv</span>
+                      <span className="field-hint">prázdné = vše</span>
+                    </div>
+                    <div className="tag-picker">
+                      {RV_RANGES.map((r) => {
+                        const active = modalItem.rvRanges.includes(r.id);
+                        return (
+                          <button
+                            key={r.id}
+                            type="button"
+                            className={`tag-chip ${active ? 'selected' : ''}`}
+                            onClick={() =>
+                              setModalItem({
+                                ...modalItem,
+                                rvRanges: toggleInArray<RvRange>(modalItem.rvRanges, r.id),
+                              })
+                            }
+                          >
+                            {r.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}

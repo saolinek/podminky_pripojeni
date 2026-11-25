@@ -56,12 +56,13 @@ type LoginIntent = 'DATABASE' | 'FEEDBACK';
 const DEFAULT_CONFIG: PlantConfig = {
   customerType: 'ODBERATEL',
   voltage: 'NN',
-  pi: 'DO_100',
   rp: null,
   svr: false,
   zue: false,
   vyrobna: false,
   vyrobnaType: null,
+  pi: null,
+  rv: null,
 };
 
 export function App() {

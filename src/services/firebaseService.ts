@@ -37,6 +37,7 @@ import {
   type PhaseId,
   type PiRange,
   type RpRange,
+  type RvRange,
   type SavedProject,
   type VoltageLevel,
   type VyrobnaType,
@@ -92,6 +93,9 @@ const PI_DEC: Record<string, PiRange> = {
   k: 'NAD_1000',
 };
 
+const RV_ENC: Record<RvRange, string> = { DO_1MW: '0', NAD_1MW: '1' };
+const RV_DEC: Record<string, RvRange> = { '0': 'DO_1MW', '1': 'NAD_1MW' };
+
 const RP_ENC: Record<RpRange, string> = { NAD_100: '1', NAD_1000: 'k' };
 const RP_DEC: Record<string, RpRange> = { '1': 'NAD_100', k: 'NAD_1000' };
 
@@ -123,6 +127,9 @@ function encodeFiltersForFirestore(item: ChecklistItemTemplate): string {
   if (item.piRanges.length > 0) {
     parts.push(`pi=${item.piRanges.map((x) => PI_ENC[x]).join(',')}`);
   }
+  if (item.rvRanges.length > 0) {
+    parts.push(`rv=${item.rvRanges.map((x) => RV_ENC[x]).join(',')}`);
+  }
   if (item.rpRanges.length > 0) {
     parts.push(`rp=${item.rpRanges.map((x) => RP_ENC[x]).join(',')}`);
   }
@@ -144,6 +151,7 @@ function encodeFiltersForFirestore(item: ChecklistItemTemplate): string {
 function decodeFiltersFromFirestore(rawRef: unknown): {
   customerTypes: CustomerType[];
   piRanges: PiRange[];
+  rvRanges: RvRange[];
   rpRanges: RpRange[];
   svrFilter: YesNo[];
   zueFilter: YesNo[];
@@ -155,6 +163,7 @@ function decodeFiltersFromFirestore(rawRef: unknown): {
   const empty = {
     customerTypes: [] as CustomerType[],
     piRanges: [] as PiRange[],
+    rvRanges: [] as RvRange[],
     rpRanges: [] as RpRange[],
     svrFilter: [] as YesNo[],
     zueFilter: [] as YesNo[],
@@ -177,6 +186,8 @@ function decodeFiltersFromFirestore(rawRef: unknown): {
       empty.customerTypes = vals.map((v) => CT_DEC[v]).filter((x): x is CustomerType => Boolean(x));
     } else if (key === 'pi') {
       empty.piRanges = vals.map((v) => PI_DEC[v]).filter((x): x is PiRange => Boolean(x));
+    } else if (key === 'rv') {
+      empty.rvRanges = vals.map((v) => RV_DEC[v]).filter((x): x is RvRange => Boolean(x));
     } else if (key === 'rp') {
       empty.rpRanges = vals.map((v) => RP_DEC[v]).filter((x): x is RpRange => Boolean(x));
     } else if (key === 'svr') {
@@ -210,6 +221,7 @@ function normalizeChecklistItem(raw: Partial<ChecklistItemTemplate>): ChecklistI
     customerTypes: Array.isArray(raw.customerTypes) ? raw.customerTypes : [],
     voltages: filterValidVoltages(raw.voltages),
     piRanges: Array.isArray(raw.piRanges) ? raw.piRanges : [],
+    rvRanges: Array.isArray(raw.rvRanges) ? raw.rvRanges : [],
     rpRanges: Array.isArray(raw.rpRanges) ? raw.rpRanges : [],
     svrFilter: Array.isArray(raw.svrFilter) ? raw.svrFilter : [],
     zueFilter: Array.isArray(raw.zueFilter) ? raw.zueFilter : [],
@@ -651,6 +663,7 @@ export async function connectAndSubscribeFirebase(
           customerTypes: decodedFilters.customerTypes,
           voltages: filterValidVoltages(d.voltages),
           piRanges: decodedFilters.piRanges,
+          rvRanges: decodedFilters.rvRanges,
           rpRanges: decodedFilters.rpRanges,
           svrFilter: decodedFilters.svrFilter,
           zueFilter: decodedFilters.zueFilter,
@@ -739,9 +752,10 @@ export async function connectAndSubscribeFirebase(
           customerType: d.customerType === 'LDS' ? 'LDS' : 'ODBERATEL',
           voltage: d.voltage === 'VN' ? 'VN' : 'NN',
           pi:
-            d.pi === 'NAD_100' || d.pi === 'NAD_400' || d.pi === 'NAD_1000'
+            d.pi === 'DO_100' || d.pi === 'NAD_100' || d.pi === 'NAD_400' || d.pi === 'NAD_1000'
               ? d.pi
-              : 'DO_100',
+              : null,
+          rv: d.rv === 'DO_1MW' || d.rv === 'NAD_1MW' ? d.rv : null,
           rp: d.rp === 'NAD_100' || d.rp === 'NAD_1000' ? d.rp : null,
           svr: Boolean(d.svr),
           zue: Boolean(d.zue),
