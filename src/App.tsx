@@ -3,7 +3,9 @@ import {
   CheckSquare,
   Lock,
   MessageSquare,
+  Moon,
   SlidersHorizontal,
+  Sun,
   Zap,
 } from 'lucide-react';
 import {
@@ -52,6 +54,27 @@ import { AdminLoginModal, ChangePasswordModal } from './components/AdminAuthModa
 
 type ActiveTab = 'CHECKLIST' | 'DATABASE' | 'FEEDBACK';
 type LoginIntent = 'DATABASE' | 'FEEDBACK';
+type ThemeMode = 'light' | 'dark';
+
+const LS_THEME_KEY = 'cez_pripojeni_theme_v1';
+
+function getSavedTheme(): ThemeMode | null {
+  try {
+    const val = localStorage.getItem(LS_THEME_KEY);
+    return val === 'dark' || val === 'light' ? val : null;
+  } catch {
+    return null;
+  }
+}
+
+function getInitialTheme(): ThemeMode {
+  const saved = getSavedTheme();
+  if (saved) return saved;
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return 'light';
+}
 
 const DEFAULT_CONFIG: PlantConfig = {
   customerType: 'ODBERATEL',
@@ -66,6 +89,7 @@ const DEFAULT_CONFIG: PlantConfig = {
 };
 
 export function App() {
+  const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
   const [activeTab, setActiveTab] = useState<ActiveTab>('CHECKLIST');
   const [config, setConfig] = useState<PlantConfig>(DEFAULT_CONFIG);
   const [groups, setGroups] = useState<PhaseGroup[]>(() => loadLocalGroups());
@@ -100,6 +124,34 @@ export function App() {
     useState<ChecklistItemTemplate | null>(null);
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (getSavedTheme() === null) {
+        setTheme(e.matches ? 'dark' : 'light');
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  const handleToggleTheme = () => {
+    setTheme((prev) => {
+      const next: ThemeMode = prev === 'dark' ? 'light' : 'dark';
+      try {
+        localStorage.setItem(LS_THEME_KEY, next);
+      } catch {
+        // Ignore storage errors (e.g. private browsing restrictions)
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     adminRoleRef.current = adminRole;
@@ -452,6 +504,18 @@ export function App() {
               )}
             </button>
           </nav>
+
+          <button
+            id="theme-toggle-btn"
+            type="button"
+            className="theme-toggle-btn"
+            onClick={handleToggleTheme}
+            aria-label={theme === 'dark' ? 'Přepnout na světlý režim' : 'Přepnout na tmavý režim'}
+            aria-pressed={theme === 'dark'}
+            title={theme === 'dark' ? 'Přepnout na světlý režim' : 'Přepnout na tmavý režim'}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
         </div>
       </header>
 
