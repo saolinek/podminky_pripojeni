@@ -95,9 +95,7 @@ export const SavedProjectsView: React.FC<SavedProjectsViewProps> = ({
                 rv: proj.rv,
                 rp: proj.rp,
                 svr: proj.svr,
-                zue: proj.zue,
-                vyrobna: proj.vyrobna,
-                vyrobnaType: proj.vyrobnaType,
+                vyrobnaTypes: proj.vyrobnaTypes,
               })
             );
             const checkedSet = new Set(proj.checkedIds);
@@ -108,9 +106,9 @@ export const SavedProjectsView: React.FC<SavedProjectsViewProps> = ({
             const customerLabel =
               CUSTOMER_TYPES.find((c) => c.id === proj.customerType)?.label || proj.customerType;
             const piLabel = proj.pi ? PI_RANGES.find((p) => p.id === proj.pi)?.label || proj.pi : null;
-            const vyrobnaLabel = proj.vyrobnaType
-              ? VYROBNA_TYPES.find((t) => t.id === proj.vyrobnaType)?.label || proj.vyrobnaType
-              : null;
+            const vyrobnaLabels = proj.vyrobnaTypes.map(
+              (vt) => VYROBNA_TYPES.find((t) => t.id === vt)?.label || vt
+            );
             const isActive = proj.id === activeProjectId;
 
             return (
@@ -144,7 +142,11 @@ export const SavedProjectsView: React.FC<SavedProjectsViewProps> = ({
                     <span className="spec-pill highlight">{customerLabel}</span>
                     <span className="spec-pill">{proj.voltage}</span>
                     {piLabel && <span className="spec-pill">Pi {piLabel}</span>}
-                    {vyrobnaLabel && <span className="spec-pill">{vyrobnaLabel}</span>}
+                    {vyrobnaLabels.map((lbl) => (
+                      <span key={lbl} className="spec-pill">
+                        {lbl}
+                      </span>
+                    ))}
                     {proj.contractNumber && (
                       <span className="spec-pill">SoP {proj.contractNumber}</span>
                     )}

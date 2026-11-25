@@ -10,7 +10,8 @@ export type VyrobnaType =
   | 'FVE_ZUE_SPOLECNY'
   | 'FVE_ZUE_SAMOSTATNE'
   | 'KGJ_SYNCHRONNI'
-  | 'KGJ_NESYNCHRONNI';
+  | 'KGJ_NESYNCHRONNI'
+  | 'KGJ_KOMBINACE';
 
 export type BuiltInPhaseId =
   | 'FAZE_1_PRIPRAVA'
@@ -41,9 +42,7 @@ export interface PlantConfig {
   voltage: VoltageLevel;
   rp: RpRange | null;
   svr: boolean;
-  zue: boolean;
-  vyrobna: boolean;
-  vyrobnaType: VyrobnaType | null;
+  vyrobnaTypes: VyrobnaType[];
   pi: PiRange | null;
   rv: RvRange | null;
 }
@@ -63,8 +62,6 @@ export interface ChecklistItemTemplate {
   rvRanges: RvRange[];
   rpRanges: RpRange[];
   svrFilter: YesNo[];
-  zueFilter: YesNo[];
-  vyrobnaFilter: YesNo[];
   vyrobnaTypes: VyrobnaType[];
   createdBy: string;
   updatedAtIso: string;
@@ -81,9 +78,7 @@ export interface SavedProject {
   rv: RvRange | null;
   rp: RpRange | null;
   svr: boolean;
-  zue: boolean;
-  vyrobna: boolean;
-  vyrobnaType: VyrobnaType | null;
+  vyrobnaTypes: VyrobnaType[];
   checkedIds: string[];
   itemNotes: Record<string, string>;
   createdBy: string;
@@ -175,6 +170,7 @@ export const VYROBNA_TYPES: {
   { id: 'FVE_ZUE_SPOLECNY', label: 'FVE + ZUE · společný střídač', group: 'FVE_ZUE' },
   { id: 'FVE_ZUE_SAMOSTATNE', label: 'FVE + ZUE · samostatně', group: 'FVE_ZUE' },
   { id: 'KGJ_SYNCHRONNI', label: 'KGJ / bioplyn / diesel · synchronní', group: 'KGJ' },
+  { id: 'KGJ_KOMBINACE', label: 'KGJ / bioplyn / diesel · kombinace', group: 'KGJ' },
   { id: 'KGJ_NESYNCHRONNI', label: 'KGJ / bioplyn / diesel · nesynchronní', group: 'KGJ' },
 ];
 
@@ -240,27 +236,18 @@ export function matchesPlantConfig(
   if (item.svrFilter.length > 0 && !item.svrFilter.includes(config.svr ? 'ANO' : 'NE')) {
     return false;
   }
-  if (item.zueFilter.length > 0 && !item.zueFilter.includes(config.zue ? 'ANO' : 'NE')) {
-    return false;
-  }
-  if (
-    item.vyrobnaFilter.length > 0 &&
-    !item.vyrobnaFilter.includes(config.vyrobna ? 'ANO' : 'NE')
-  ) {
-    return false;
-  }
   if (item.vyrobnaTypes.length > 0) {
-    if (!config.vyrobna || !config.vyrobnaType || !item.vyrobnaTypes.includes(config.vyrobnaType)) {
+    if (!item.vyrobnaTypes.some((t) => config.vyrobnaTypes.includes(t))) {
       return false;
     }
   }
   if (item.piRanges.length > 0) {
-    if (!config.vyrobna || !config.pi || !item.piRanges.includes(config.pi)) {
+    if (!config.pi || !item.piRanges.includes(config.pi)) {
       return false;
     }
   }
   if (item.rvRanges.length > 0) {
-    if (!config.vyrobna || !config.rv || !item.rvRanges.includes(config.rv)) {
+    if (!config.rv || !item.rvRanges.includes(config.rv)) {
       return false;
     }
   }

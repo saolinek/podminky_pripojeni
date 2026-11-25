@@ -81,9 +81,7 @@ const DEFAULT_CONFIG: PlantConfig = {
   voltage: 'NN',
   rp: null,
   svr: false,
-  zue: false,
-  vyrobna: false,
-  vyrobnaType: null,
+  vyrobnaTypes: [],
   pi: null,
   rv: null,
 };

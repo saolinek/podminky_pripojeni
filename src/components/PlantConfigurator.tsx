@@ -21,15 +21,39 @@ interface PlantConfiguratorProps {
   onResetConfig: () => void;
 }
 
-type VyrobnaMainChoice = 'FVE' | 'ZUE' | 'FVE_ZUE' | 'KGJ';
+type VyrobnaMainChoice = 'FVE' | 'ZUE' | 'KGJ';
 
-function getVyrobnaMainChoice(type: VyrobnaType | null): VyrobnaMainChoice | null {
-  if (!type) return null;
-  if (type === 'FVE') return 'FVE';
-  if (type === 'ZUE') return 'ZUE';
-  if (type === 'FVE_ZUE_SPOLECNY' || type === 'FVE_ZUE_SAMOSTATNE') return 'FVE_ZUE';
-  if (type === 'KGJ_SYNCHRONNI' || type === 'KGJ_NESYNCHRONNI') return 'KGJ';
-  return null;
+const KGJ_TYPES: readonly VyrobnaType[] = ['KGJ_SYNCHRONNI', 'KGJ_KOMBINACE', 'KGJ_NESYNCHRONNI'];
+
+function normalizeVyrobnaTypes(types: Iterable<VyrobnaType>): VyrobnaType[] {
+  const set = new Set<VyrobnaType>(types);
+  const hasFve = set.has('FVE');
+  const hasZue = set.has('ZUE');
+  const hasKgj = KGJ_TYPES.some((t) => set.has(t));
+
+  if (hasFve && hasZue) {
+    if (!set.has('FVE_ZUE_SPOLECNY') && !set.has('FVE_ZUE_SAMOSTATNE')) {
+      set.add('FVE_ZUE_SPOLECNY');
+    }
+  } else {
+    set.delete('FVE_ZUE_SPOLECNY');
+    set.delete('FVE_ZUE_SAMOSTATNE');
+  }
+
+  if (hasKgj) {
+    if (set.has('KGJ_NESYNCHRONNI')) {
+      set.delete('KGJ_SYNCHRONNI');
+      set.delete('KGJ_KOMBINACE');
+    } else if (hasFve || hasZue) {
+      set.add('KGJ_KOMBINACE');
+      set.delete('KGJ_SYNCHRONNI');
+    } else {
+      set.add('KGJ_SYNCHRONNI');
+      set.delete('KGJ_KOMBINACE');
+    }
+  }
+
+  return Array.from(set);
 }
 
 export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
@@ -37,7 +61,11 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
   onChange,
   onResetConfig,
 }) => {
-  const vyrobnaMain = getVyrobnaMainChoice(config.vyrobnaType);
+  const hasFve = config.vyrobnaTypes.includes('FVE');
+  const hasZue = config.vyrobnaTypes.includes('ZUE');
+  const hasFveAndZue = hasFve && hasZue;
+  const hasKgj = KGJ_TYPES.some((t) => config.vyrobnaTypes.includes(t));
+  const kgjCombinedWithOther = hasKgj && (hasFve || hasZue);
 
   const handleCustomerTypeChange = (customerType: CustomerType) => {
     onChange({ ...config, customerType });
@@ -59,31 +87,49 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
     onChange({ ...config, rv: config.rv === rv ? null : rv });
   };
 
-  const handleVyrobnaToggle = (vyrobna: boolean) => {
-    onChange({
-      ...config,
-      vyrobna,
-      vyrobnaType: vyrobna ? config.vyrobnaType : null,
-      pi: vyrobna ? config.pi : null,
-      rv: vyrobna ? config.rv : null,
-    });
+  const handleVyrobnaMainToggle = (main: VyrobnaMainChoice) => {
+    const next = new Set<VyrobnaType>(config.vyrobnaTypes);
+    if (main === 'FVE') {
+      if (next.has('FVE')) {
+        next.delete('FVE');
+      } else {
+        next.add('FVE');
+      }
+    } else if (main === 'ZUE') {
+      if (next.has('ZUE')) {
+        next.delete('ZUE');
+      } else {
+        next.add('ZUE');
+      }
+    } else if (main === 'KGJ') {
+      if (hasKgj) {
+        KGJ_TYPES.forEach((t) => next.delete(t));
+      } else {
+        next.add(hasFve || hasZue ? 'KGJ_KOMBINACE' : 'KGJ_SYNCHRONNI');
+      }
+    }
+    onChange({ ...config, vyrobnaTypes: normalizeVyrobnaTypes(next) });
   };
 
-  const handleVyrobnaMainClick = (main: VyrobnaMainChoice) => {
-    if (main === 'FVE') {
-      onChange({ ...config, vyrobnaType: 'FVE' });
-    } else if (main === 'ZUE') {
-      onChange({ ...config, vyrobnaType: 'ZUE' });
-    } else if (main === 'FVE_ZUE') {
-      const next: VyrobnaType =
-        config.vyrobnaType === 'FVE_ZUE_SAMOSTATNE' ? 'FVE_ZUE_SAMOSTATNE' : 'FVE_ZUE_SPOLECNY';
-      onChange({ ...config, vyrobnaType: next });
-    } else if (main === 'KGJ') {
-      const next: VyrobnaType =
-        config.vyrobnaType === 'KGJ_NESYNCHRONNI' ? 'KGJ_NESYNCHRONNI' : 'KGJ_SYNCHRONNI';
-      onChange({ ...config, vyrobnaType: next });
-    }
+  const handleFveZueSubChange = (sub: 'FVE_ZUE_SPOLECNY' | 'FVE_ZUE_SAMOSTATNE') => {
+    const next = new Set<VyrobnaType>(config.vyrobnaTypes);
+    next.delete('FVE_ZUE_SPOLECNY');
+    next.delete('FVE_ZUE_SAMOSTATNE');
+    next.add(sub);
+    onChange({ ...config, vyrobnaTypes: normalizeVyrobnaTypes(next) });
   };
+
+  const handleKgjSubChange = (sub: 'KGJ_SYNCHRONNI' | 'KGJ_KOMBINACE' | 'KGJ_NESYNCHRONNI') => {
+    const next = new Set<VyrobnaType>(config.vyrobnaTypes);
+    KGJ_TYPES.forEach((t) => next.delete(t));
+    next.add(sub);
+    onChange({ ...config, vyrobnaTypes: normalizeVyrobnaTypes(next) });
+  };
+
+  const kgjPrimaryType: 'KGJ_SYNCHRONNI' | 'KGJ_KOMBINACE' = kgjCombinedWithOther
+    ? 'KGJ_KOMBINACE'
+    : 'KGJ_SYNCHRONNI';
+  const kgjPrimaryLabel = kgjCombinedWithOther ? 'Kombinace' : 'Synchronní';
 
   return (
     <aside className="surface-card config-sticky" aria-label="Konfigurátor zdroje">
@@ -177,177 +223,129 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
         </div>
 
         <div className="field-group">
-          <span className="field-label">ZUE</span>
-          <div className="segmented-2">
-            <button
-              id="zue-btn-ANO"
-              type="button"
-              className={`choice-btn ${config.zue ? 'selected' : ''}`}
-              onClick={() => onChange({ ...config, zue: true })}
-            >
-              Ano
-            </button>
-            <button
-              id="zue-btn-NE"
-              type="button"
-              className={`choice-btn ${!config.zue ? 'selected' : ''}`}
-              onClick={() => onChange({ ...config, zue: false })}
-            >
-              Ne
-            </button>
-          </div>
-        </div>
-
-        <div className="field-group">
           <span className="field-label">Výrobna</span>
-          <div className="segmented-2">
-            <button
-              id="vyrobna-btn-ANO"
-              type="button"
-              className={`choice-btn ${config.vyrobna ? 'selected' : ''}`}
-              onClick={() => handleVyrobnaToggle(true)}
-            >
-              Ano
-            </button>
-            <button
-              id="vyrobna-btn-NE"
-              type="button"
-              className={`choice-btn ${!config.vyrobna ? 'selected' : ''}`}
-              onClick={() => handleVyrobnaToggle(false)}
-            >
-              Ne
-            </button>
-          </div>
+          <div className="vyrobna-subpanel">
+            <span className="field-label">Typ výrobny</span>
+            <div className="vyrobna-type-list">
+              <button
+                id="vyrobna-type-FVE"
+                type="button"
+                aria-pressed={hasFve}
+                className={`choice-btn ${hasFve ? 'selected' : ''}`}
+                onClick={() => handleVyrobnaMainToggle('FVE')}
+              >
+                FVE
+              </button>
+              <button
+                id="vyrobna-type-ZUE"
+                type="button"
+                aria-pressed={hasZue}
+                className={`choice-btn ${hasZue ? 'selected' : ''}`}
+                onClick={() => handleVyrobnaMainToggle('ZUE')}
+              >
+                ZUE
+              </button>
+              <button
+                id="vyrobna-type-KGJ"
+                type="button"
+                aria-pressed={hasKgj}
+                className={`choice-btn ${hasKgj ? 'selected' : ''}`}
+                onClick={() => handleVyrobnaMainToggle('KGJ')}
+              >
+                KGJ / bioplyn / diesel
+              </button>
+            </div>
 
-          {config.vyrobna && (
-            <div className="vyrobna-subpanel">
-              <span className="field-label">Typ výrobny</span>
-              <div className="vyrobna-type-list">
-                <button
-                  id="vyrobna-type-FVE"
-                  type="button"
-                  className={`choice-btn ${vyrobnaMain === 'FVE' ? 'selected' : ''}`}
-                  onClick={() => handleVyrobnaMainClick('FVE')}
-                >
-                  FVE
-                </button>
-                <button
-                  id="vyrobna-type-ZUE"
-                  type="button"
-                  className={`choice-btn ${vyrobnaMain === 'ZUE' ? 'selected' : ''}`}
-                  onClick={() => handleVyrobnaMainClick('ZUE')}
-                >
-                  ZUE
-                </button>
-                <button
-                  id="vyrobna-type-FVE_ZUE"
-                  type="button"
-                  className={`choice-btn ${vyrobnaMain === 'FVE_ZUE' ? 'selected' : ''}`}
-                  onClick={() => handleVyrobnaMainClick('FVE_ZUE')}
-                >
-                  FVE + ZUE
-                </button>
-                <button
-                  id="vyrobna-type-KGJ"
-                  type="button"
-                  className={`choice-btn ${vyrobnaMain === 'KGJ' ? 'selected' : ''}`}
-                  onClick={() => handleVyrobnaMainClick('KGJ')}
-                >
-                  KGJ / bioplyn / diesel
-                </button>
-              </div>
-
-              {vyrobnaMain === 'FVE_ZUE' && (
-                <div className="vyrobna-subtype-wrap">
-                  <span className="field-label">Zapojení FVE + ZUE</span>
-                  <div className="segmented-2">
-                    <button
-                      id="vyrobna-sub-FVE_ZUE_SPOLECNY"
-                      type="button"
-                      className={`choice-btn ${
-                        config.vyrobnaType === 'FVE_ZUE_SPOLECNY' ? 'selected' : ''
-                      }`}
-                      onClick={() => onChange({ ...config, vyrobnaType: 'FVE_ZUE_SPOLECNY' })}
-                    >
-                      Společný střídač
-                    </button>
-                    <button
-                      id="vyrobna-sub-FVE_ZUE_SAMOSTATNE"
-                      type="button"
-                      className={`choice-btn ${
-                        config.vyrobnaType === 'FVE_ZUE_SAMOSTATNE' ? 'selected' : ''
-                      }`}
-                      onClick={() => onChange({ ...config, vyrobnaType: 'FVE_ZUE_SAMOSTATNE' })}
-                    >
-                      Samostatně
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {vyrobnaMain === 'KGJ' && (
-                <div className="vyrobna-subtype-wrap">
-                  <span className="field-label">Typ generátoru</span>
-                  <div className="segmented-2">
-                    <button
-                      id="vyrobna-sub-KGJ_SYNCHRONNI"
-                      type="button"
-                      className={`choice-btn ${
-                        config.vyrobnaType === 'KGJ_SYNCHRONNI' ? 'selected' : ''
-                      }`}
-                      onClick={() => onChange({ ...config, vyrobnaType: 'KGJ_SYNCHRONNI' })}
-                    >
-                      Synchronní
-                    </button>
-                    <button
-                      id="vyrobna-sub-KGJ_NESYNCHRONNI"
-                      type="button"
-                      className={`choice-btn ${
-                        config.vyrobnaType === 'KGJ_NESYNCHRONNI' ? 'selected' : ''
-                      }`}
-                      onClick={() => onChange({ ...config, vyrobnaType: 'KGJ_NESYNCHRONNI' })}
-                    >
-                      Nesynchronní
-                    </button>
-                  </div>
-                </div>
-              )}
-
+            {hasFveAndZue && (
               <div className="vyrobna-subtype-wrap">
-                <span className="field-label">Pi</span>
-                <div className="choice-grid-2">
-                  {PI_RANGES.map((p) => (
-                    <button
-                      key={p.id}
-                      id={`pi-btn-${p.id}`}
-                      type="button"
-                      className={`choice-btn ${config.pi === p.id ? 'selected' : ''}`}
-                      onClick={() => handlePiToggle(p.id)}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
+                <span className="field-label">Zapojení FVE + ZUE</span>
+                <div className="segmented-2">
+                  <button
+                    id="vyrobna-sub-FVE_ZUE_SPOLECNY"
+                    type="button"
+                    className={`choice-btn ${
+                      config.vyrobnaTypes.includes('FVE_ZUE_SPOLECNY') ? 'selected' : ''
+                    }`}
+                    onClick={() => handleFveZueSubChange('FVE_ZUE_SPOLECNY')}
+                  >
+                    Společný střídač
+                  </button>
+                  <button
+                    id="vyrobna-sub-FVE_ZUE_SAMOSTATNE"
+                    type="button"
+                    className={`choice-btn ${
+                      config.vyrobnaTypes.includes('FVE_ZUE_SAMOSTATNE') ? 'selected' : ''
+                    }`}
+                    onClick={() => handleFveZueSubChange('FVE_ZUE_SAMOSTATNE')}
+                  >
+                    Samostatně
+                  </button>
                 </div>
               </div>
+            )}
 
+            {hasKgj && (
               <div className="vyrobna-subtype-wrap">
-                <span className="field-label">Rv</span>
-                <div className="choice-grid-2">
-                  {RV_RANGES.map((r) => (
-                    <button
-                      key={r.id}
-                      id={`rv-btn-${r.id}`}
-                      type="button"
-                      className={`choice-btn ${config.rv === r.id ? 'selected' : ''}`}
-                      onClick={() => handleRvToggle(r.id)}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
+                <span className="field-label">Typ generátoru</span>
+                <div className="segmented-2">
+                  <button
+                    id={`vyrobna-sub-${kgjPrimaryType}`}
+                    type="button"
+                    className={`choice-btn ${
+                      config.vyrobnaTypes.includes(kgjPrimaryType) ? 'selected' : ''
+                    }`}
+                    onClick={() => handleKgjSubChange(kgjPrimaryType)}
+                  >
+                    {kgjPrimaryLabel}
+                  </button>
+                  <button
+                    id="vyrobna-sub-KGJ_NESYNCHRONNI"
+                    type="button"
+                    className={`choice-btn ${
+                      config.vyrobnaTypes.includes('KGJ_NESYNCHRONNI') ? 'selected' : ''
+                    }`}
+                    onClick={() => handleKgjSubChange('KGJ_NESYNCHRONNI')}
+                  >
+                    Nesynchronní
+                  </button>
                 </div>
+              </div>
+            )}
+
+            <div className="vyrobna-subtype-wrap">
+              <span className="field-label">Pi</span>
+              <div className="choice-grid-2">
+                {PI_RANGES.map((p) => (
+                  <button
+                    key={p.id}
+                    id={`pi-btn-${p.id}`}
+                    type="button"
+                    className={`choice-btn ${config.pi === p.id ? 'selected' : ''}`}
+                    onClick={() => handlePiToggle(p.id)}
+                  >
+                    {p.label}
+                  </button>
+                ))}
               </div>
             </div>
-          )}
+
+            <div className="vyrobna-subtype-wrap">
+              <span className="field-label">Rv</span>
+              <div className="choice-grid-2">
+                {RV_RANGES.map((r) => (
+                  <button
+                    key={r.id}
+                    id={`rv-btn-${r.id}`}
+                    type="button"
+                    className={`choice-btn ${config.rv === r.id ? 'selected' : ''}`}
+                    onClick={() => handleRvToggle(r.id)}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </aside>

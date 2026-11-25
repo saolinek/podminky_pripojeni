@@ -109,6 +109,7 @@ const VT_ENC: Record<VyrobnaType, string> = {
   FVE_ZUE_SAMOSTATNE: 'M',
   KGJ_SYNCHRONNI: 'Y',
   KGJ_NESYNCHRONNI: 'N',
+  KGJ_KOMBINACE: 'K',
 };
 const VT_DEC: Record<string, VyrobnaType> = {
   F: 'FVE',
@@ -117,6 +118,7 @@ const VT_DEC: Record<string, VyrobnaType> = {
   M: 'FVE_ZUE_SAMOSTATNE',
   Y: 'KGJ_SYNCHRONNI',
   N: 'KGJ_NESYNCHRONNI',
+  K: 'KGJ_KOMBINACE',
 };
 
 function encodeFiltersForFirestore(item: ChecklistItemTemplate): string {
@@ -136,12 +138,6 @@ function encodeFiltersForFirestore(item: ChecklistItemTemplate): string {
   if (item.svrFilter.length > 0) {
     parts.push(`svr=${item.svrFilter.map((x) => YN_ENC[x]).join(',')}`);
   }
-  if (item.zueFilter.length > 0) {
-    parts.push(`zue=${item.zueFilter.map((x) => YN_ENC[x]).join(',')}`);
-  }
-  if (item.vyrobnaFilter.length > 0) {
-    parts.push(`vyr=${item.vyrobnaFilter.map((x) => YN_ENC[x]).join(',')}`);
-  }
   if (item.vyrobnaTypes.length > 0) {
     parts.push(`vt=${item.vyrobnaTypes.map((x) => VT_ENC[x]).join(',')}`);
   }
@@ -154,8 +150,6 @@ function decodeFiltersFromFirestore(rawRef: unknown): {
   rvRanges: RvRange[];
   rpRanges: RpRange[];
   svrFilter: YesNo[];
-  zueFilter: YesNo[];
-  vyrobnaFilter: YesNo[];
   vyrobnaTypes: VyrobnaType[];
   reference: string;
 } {
@@ -166,8 +160,6 @@ function decodeFiltersFromFirestore(rawRef: unknown): {
     rvRanges: [] as RvRange[],
     rpRanges: [] as RpRange[],
     svrFilter: [] as YesNo[],
-    zueFilter: [] as YesNo[],
-    vyrobnaFilter: [] as YesNo[],
     vyrobnaTypes: [] as VyrobnaType[],
     reference: str.startsWith(FILTER_V2_PREFIX) ? '' : str,
   };
@@ -192,10 +184,6 @@ function decodeFiltersFromFirestore(rawRef: unknown): {
       empty.rpRanges = vals.map((v) => RP_DEC[v]).filter((x): x is RpRange => Boolean(x));
     } else if (key === 'svr') {
       empty.svrFilter = vals.map((v) => YN_DEC[v]).filter((x): x is YesNo => Boolean(x));
-    } else if (key === 'zue') {
-      empty.zueFilter = vals.map((v) => YN_DEC[v]).filter((x): x is YesNo => Boolean(x));
-    } else if (key === 'vyr') {
-      empty.vyrobnaFilter = vals.map((v) => YN_DEC[v]).filter((x): x is YesNo => Boolean(x));
     } else if (key === 'vt') {
       empty.vyrobnaTypes = vals.map((v) => VT_DEC[v]).filter((x): x is VyrobnaType => Boolean(x));
     }
@@ -224,8 +212,6 @@ function normalizeChecklistItem(raw: Partial<ChecklistItemTemplate>): ChecklistI
     rvRanges: Array.isArray(raw.rvRanges) ? raw.rvRanges : [],
     rpRanges: Array.isArray(raw.rpRanges) ? raw.rpRanges : [],
     svrFilter: Array.isArray(raw.svrFilter) ? raw.svrFilter : [],
-    zueFilter: Array.isArray(raw.zueFilter) ? raw.zueFilter : [],
-    vyrobnaFilter: Array.isArray(raw.vyrobnaFilter) ? raw.vyrobnaFilter : [],
     vyrobnaTypes: Array.isArray(raw.vyrobnaTypes) ? raw.vyrobnaTypes : [],
     createdBy: String(raw.createdBy || 'system'),
     updatedAtIso: String(raw.updatedAtIso || new Date().toISOString()),
@@ -666,8 +652,6 @@ export async function connectAndSubscribeFirebase(
           rvRanges: decodedFilters.rvRanges,
           rpRanges: decodedFilters.rpRanges,
           svrFilter: decodedFilters.svrFilter,
-          zueFilter: decodedFilters.zueFilter,
-          vyrobnaFilter: decodedFilters.vyrobnaFilter,
           vyrobnaTypes: decodedFilters.vyrobnaTypes,
           createdBy: String(d.createdBy || 'system'),
           updatedAtIso: timestampToIso(d.updatedAt),
@@ -758,9 +742,11 @@ export async function connectAndSubscribeFirebase(
           rv: d.rv === 'DO_1MW' || d.rv === 'NAD_1MW' ? d.rv : null,
           rp: d.rp === 'NAD_100' || d.rp === 'NAD_1000' ? d.rp : null,
           svr: Boolean(d.svr),
-          zue: Boolean(d.zue),
-          vyrobna: Boolean(d.vyrobna),
-          vyrobnaType: d.vyrobnaType || null,
+          vyrobnaTypes: Array.isArray(d.vyrobnaTypes)
+            ? d.vyrobnaTypes
+            : d.vyrobnaType
+              ? [d.vyrobnaType]
+              : [],
           checkedIds: Array.isArray(d.checkedIds) ? d.checkedIds : [],
           itemNotes: d.itemNotes && typeof d.itemNotes === 'object' ? d.itemNotes : {},
           createdBy: String(d.createdBy || ''),
