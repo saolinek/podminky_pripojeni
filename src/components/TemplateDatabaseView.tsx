@@ -195,7 +195,6 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
         }
         if (
           filterVyrobnaTypes.length > 0 &&
-          item.vyrobnaTypes.length > 0 &&
           !item.vyrobnaTypes.some((t) => filterVyrobnaTypes.includes(t))
         ) {
           return false;
@@ -1039,7 +1038,7 @@ export const TemplateDatabaseView: React.FC<TemplateDatabaseViewProps> = ({
                 <div className="field-group">
                   <div className="field-label-row">
                     <span className="field-label">Typ výrobny</span>
-                    <span className="field-hint">prázdné = vše</span>
+                    <span className="field-hint">prázdné = bez výrobny</span>
                   </div>
                   <div className="tag-picker">
                     {VYROBNA_TYPES.map((vt) => {

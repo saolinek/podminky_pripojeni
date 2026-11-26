@@ -2,7 +2,7 @@ export type CustomerType = 'LDS' | 'ODBERATEL';
 export type VoltageLevel = 'NN' | 'VN';
 export type PiRange = 'DO_100' | 'NAD_100' | 'NAD_400' | 'NAD_1000';
 export type RvRange = 'DO_1MW' | 'NAD_1MW';
-export type RpRange = 'NAD_100' | 'NAD_1000';
+export type RpRange = 'DO_100' | 'NAD_100' | 'NAD_1000';
 export type YesNo = 'ANO' | 'NE';
 export type VyrobnaType =
   | 'FVE'
@@ -40,7 +40,7 @@ export interface PhaseGroup {
 export interface PlantConfig {
   customerType: CustomerType;
   voltage: VoltageLevel;
-  rp: RpRange | null;
+  rp: RpRange;
   svr: boolean;
   vyrobnaTypes: VyrobnaType[];
   pi: PiRange | null;
@@ -76,7 +76,7 @@ export interface SavedProject {
   voltage: VoltageLevel;
   pi: PiRange | null;
   rv: RvRange | null;
-  rp: RpRange | null;
+  rp: RpRange;
   svr: boolean;
   vyrobnaTypes: VyrobnaType[];
   checkedIds: string[];
@@ -148,6 +148,7 @@ export const RP_RANGES: {
   id: RpRange;
   label: string;
 }[] = [
+  { id: 'DO_100', label: 'do 100 kW' },
   { id: 'NAD_100', label: 'nad 100 kW' },
   { id: 'NAD_1000', label: 'nad 1000 kW' },
 ];
@@ -228,18 +229,18 @@ export function matchesPlantConfig(
   if (item.voltages.length > 0 && !item.voltages.includes(config.voltage)) {
     return false;
   }
-  if (item.rpRanges.length > 0) {
-    if (!config.rp || !item.rpRanges.includes(config.rp)) {
-      return false;
-    }
+  if (item.rpRanges.length > 0 && !item.rpRanges.includes(config.rp)) {
+    return false;
   }
   if (item.svrFilter.length > 0 && !item.svrFilter.includes(config.svr ? 'ANO' : 'NE')) {
     return false;
   }
-  if (item.vyrobnaTypes.length > 0) {
-    if (!item.vyrobnaTypes.some((t) => config.vyrobnaTypes.includes(t))) {
+  if (item.vyrobnaTypes.length === 0) {
+    if (config.vyrobnaTypes.length > 0) {
       return false;
     }
+  } else if (!item.vyrobnaTypes.some((t) => config.vyrobnaTypes.includes(t))) {
+    return false;
   }
   if (item.piRanges.length > 0) {
     if (!config.pi || !item.piRanges.includes(config.pi)) {

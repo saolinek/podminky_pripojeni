@@ -96,8 +96,8 @@ const PI_DEC: Record<string, PiRange> = {
 const RV_ENC: Record<RvRange, string> = { DO_1MW: '0', NAD_1MW: '1' };
 const RV_DEC: Record<string, RvRange> = { '0': 'DO_1MW', '1': 'NAD_1MW' };
 
-const RP_ENC: Record<RpRange, string> = { NAD_100: '1', NAD_1000: 'k' };
-const RP_DEC: Record<string, RpRange> = { '1': 'NAD_100', k: 'NAD_1000' };
+const RP_ENC: Record<RpRange, string> = { DO_100: '0', NAD_100: '1', NAD_1000: 'k' };
+const RP_DEC: Record<string, RpRange> = { '0': 'DO_100', '1': 'NAD_100', k: 'NAD_1000' };
 
 const YN_ENC: Record<YesNo, string> = { ANO: 'A', NE: 'N' };
 const YN_DEC: Record<string, YesNo> = { A: 'ANO', N: 'NE' };
@@ -740,7 +740,10 @@ export async function connectAndSubscribeFirebase(
               ? d.pi
               : null,
           rv: d.rv === 'DO_1MW' || d.rv === 'NAD_1MW' ? d.rv : null,
-          rp: d.rp === 'NAD_100' || d.rp === 'NAD_1000' ? d.rp : null,
+          rp:
+            d.rp === 'DO_100' || d.rp === 'NAD_100' || d.rp === 'NAD_1000'
+              ? d.rp
+              : 'DO_100',
           svr: Boolean(d.svr),
           vyrobnaTypes: Array.isArray(d.vyrobnaTypes)
             ? d.vyrobnaTypes

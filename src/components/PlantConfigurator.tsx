@@ -65,6 +65,7 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
   const hasZue = config.vyrobnaTypes.includes('ZUE');
   const hasFveAndZue = hasFve && hasZue;
   const hasKgj = KGJ_TYPES.some((t) => config.vyrobnaTypes.includes(t));
+  const hasVyrobna = config.vyrobnaTypes.length > 0;
   const kgjCombinedWithOther = hasKgj && (hasFve || hasZue);
 
   const handleCustomerTypeChange = (customerType: CustomerType) => {
@@ -75,16 +76,16 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
     onChange({ ...config, voltage });
   };
 
-  const handleRpToggle = (rp: RpRange) => {
-    onChange({ ...config, rp: config.rp === rp ? null : rp });
+  const handleRpChange = (rp: RpRange) => {
+    onChange({ ...config, rp });
   };
 
-  const handlePiToggle = (pi: PiRange) => {
-    onChange({ ...config, pi: config.pi === pi ? null : pi });
+  const handlePiChange = (pi: PiRange) => {
+    onChange({ ...config, pi });
   };
 
-  const handleRvToggle = (rv: RvRange) => {
-    onChange({ ...config, rv: config.rv === rv ? null : rv });
+  const handleRvChange = (rv: RvRange) => {
+    onChange({ ...config, rv });
   };
 
   const handleVyrobnaMainToggle = (main: VyrobnaMainChoice) => {
@@ -108,7 +109,14 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
         next.add(hasFve || hasZue ? 'KGJ_KOMBINACE' : 'KGJ_SYNCHRONNI');
       }
     }
-    onChange({ ...config, vyrobnaTypes: normalizeVyrobnaTypes(next) });
+    const nextTypes = normalizeVyrobnaTypes(next);
+    const nextHasVyrobna = nextTypes.length > 0;
+    onChange({
+      ...config,
+      vyrobnaTypes: nextTypes,
+      pi: nextHasVyrobna ? (config.pi ?? 'DO_100') : null,
+      rv: nextHasVyrobna ? (config.rv ?? 'DO_1MW') : null,
+    });
   };
 
   const handleFveZueSubChange = (sub: 'FVE_ZUE_SPOLECNY' | 'FVE_ZUE_SAMOSTATNE') => {
@@ -185,14 +193,14 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
 
         <div className="field-group">
           <span className="field-label">Rp</span>
-          <div className="choice-grid-2">
+          <div className="choice-grid-3">
             {RP_RANGES.map((r) => (
               <button
                 key={r.id}
                 id={`rp-btn-${r.id}`}
                 type="button"
                 className={`choice-btn ${config.rp === r.id ? 'selected' : ''}`}
-                onClick={() => handleRpToggle(r.id)}
+                onClick={() => handleRpChange(r.id)}
               >
                 {r.label}
               </button>
@@ -312,39 +320,43 @@ export const PlantConfigurator: React.FC<PlantConfiguratorProps> = ({
               </div>
             )}
 
-            <div className="vyrobna-subtype-wrap">
-              <span className="field-label">Pi</span>
-              <div className="choice-grid-2">
-                {PI_RANGES.map((p) => (
-                  <button
-                    key={p.id}
-                    id={`pi-btn-${p.id}`}
-                    type="button"
-                    className={`choice-btn ${config.pi === p.id ? 'selected' : ''}`}
-                    onClick={() => handlePiToggle(p.id)}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {hasVyrobna && (
+              <>
+                <div className="vyrobna-subtype-wrap">
+                  <span className="field-label">Pi</span>
+                  <div className="segmented-grid-2">
+                    {PI_RANGES.map((p) => (
+                      <button
+                        key={p.id}
+                        id={`pi-btn-${p.id}`}
+                        type="button"
+                        className={`choice-btn ${config.pi === p.id ? 'selected' : ''}`}
+                        onClick={() => handlePiChange(p.id)}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            <div className="vyrobna-subtype-wrap">
-              <span className="field-label">Rv</span>
-              <div className="choice-grid-2">
-                {RV_RANGES.map((r) => (
-                  <button
-                    key={r.id}
-                    id={`rv-btn-${r.id}`}
-                    type="button"
-                    className={`choice-btn ${config.rv === r.id ? 'selected' : ''}`}
-                    onClick={() => handleRvToggle(r.id)}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+                <div className="vyrobna-subtype-wrap">
+                  <span className="field-label">Rv</span>
+                  <div className="segmented-2">
+                    {RV_RANGES.map((r) => (
+                      <button
+                        key={r.id}
+                        id={`rv-btn-${r.id}`}
+                        type="button"
+                        className={`choice-btn ${config.rv === r.id ? 'selected' : ''}`}
+                        onClick={() => handleRvChange(r.id)}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

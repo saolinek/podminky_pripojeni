@@ -463,6 +463,7 @@ h3 {
 
 /* segmented control */
 .segmented-2,
+.segmented-grid-2,
 .choice-grid-3 {
   display: grid;
   gap: 0.15rem;
@@ -471,7 +472,8 @@ h3 {
   border-radius: var(--r-md);
 }
 
-.segmented-2 {
+.segmented-2,
+.segmented-grid-2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -504,18 +506,27 @@ h3 {
 }
 
 .segmented-2 .choice-btn,
+.segmented-grid-2 .choice-btn,
 .choice-grid-3 .choice-btn {
   border: none;
   background: transparent;
   text-align: center;
-  padding: 0.38rem 0.5rem;
+  padding: 0.38rem 0.35rem;
 }
 
 .segmented-2 .choice-btn.selected,
+.segmented-grid-2 .choice-btn.selected,
 .choice-grid-3 .choice-btn.selected {
-  background: var(--surface);
-  color: var(--ink);
+  background: var(--accent);
+  color: #ffffff;
   box-shadow: var(--shadow-sm);
+}
+
+.segmented-2 .choice-btn.selected:hover,
+.segmented-grid-2 .choice-btn.selected:hover,
+.choice-grid-3 .choice-btn.selected:hover {
+  background: var(--accent-hover);
+  color: #ffffff;
 }
 
 .vyrobna-subpanel {

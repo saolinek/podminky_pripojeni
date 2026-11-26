@@ -79,7 +79,7 @@ function getInitialTheme(): ThemeMode {
 const DEFAULT_CONFIG: PlantConfig = {
   customerType: 'ODBERATEL',
   voltage: 'NN',
-  rp: null,
+  rp: 'DO_100',
   svr: false,
   vyrobnaTypes: [],
   pi: null,
